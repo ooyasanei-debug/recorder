@@ -86,6 +86,15 @@
     .stop{margin-left:auto}.mk{flex:1;padding:12px 0;font-size:16px}#mkNote{flex-basis:100%}
     input[type=text],select,textarea{font-size:16px}
   }
+  .chip{font-size:12px;padding:4px 10px;border-radius:999px;background:var(--soft);color:var(--sub);font-weight:bold}
+  .chip.on{background:#e3f4ea;color:var(--green)}
+  #cfgCard .grid{display:grid;grid-template-columns:110px 1fr;gap:8px 10px;align-items:center;font-size:13px}
+  #cfgCard .grid .k{color:var(--sub)}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+  .prim{background:var(--blue);color:#fff;padding:9px 16px;font-weight:bold}
+  .up{margin-top:10px}
+  .noSheet .onlySheet{display:none!important}
+  @media (max-width:640px){#cfgCard .grid{grid-template-columns:1fr}}
   .noScreen .online,.noScreen .onlyScreen,.noFolder .onlyFolder{display:none!important}
   .noScreen .modes{grid-template-columns:1fr}
   .mobileNote{display:none;margin-top:10px;font-size:12px;color:var(--sub)}
@@ -100,8 +109,24 @@
     <div class="tabs">
       <button class="tab on" data-tab="rec">録音する</button>
       <button class="tab" data-tab="conv">動画から変換</button>
+      <button class="tab" id="btnCfg" title="スプシ連携の設定">⚙ <span id="cfgChip" class="chip">スプシ未設定</span></button>
     </div>
   </header>
+
+  <section class="card hide" id="cfgCard">
+    <h2>スプシ連携の設定<span class="hint">録音をGoogleドライブに保存し、スプシに依頼文と一緒に登録します</span></h2>
+    <div class="grid">
+      <span class="k">連携URL</span><input type="text" id="cfgUrl" placeholder="https://script.google.com/macros/s/…/exec">
+      <span class="k">合言葉</span><input type="text" id="cfgKey" placeholder="管理者から聞いた合言葉">
+      <span class="k">あなたの名前</span><input type="text" id="cfgUser" placeholder="スプシの「登録者」欄に入ります">
+    </div>
+    <div class="btnrow">
+      <button class="prim" id="cfgSave">保存して接続テスト</button>
+      <button class="sub" id="cfgShare">メンバー用の設定リンクをコピー</button>
+      <button class="sub" id="cfgClose">閉じる</button>
+      <span class="small" id="cfgMsg"></span>
+    </div>
+  </section>
 
   <div class="alert info" id="recover"></div>
   <div class="alert" id="alert"></div>
@@ -130,6 +155,7 @@
         <span></span>
         <span class="k">保存先</span>
         <div class="radio">
+          <label class="onlySheet"><input type="radio" name="save" value="sheet"> スプシに登録</label>
           <label><input type="radio" name="save" value="download"> ダウンロード</label>
           <label class="onlyFolder"><input type="radio" name="save" value="folder"> フォルダを選ぶ</label>
           <label class="onlyScreen"><input type="checkbox" id="optVideo"> 画面の動画も保存（オンライン時）</label>
@@ -165,12 +191,13 @@
   <!-- ===== 変換タブ ===== -->
   <div id="tab-conv" class="hide">
     <section class="card">
-      <h2><span class="n">1</span>録画した動画を選ぶ<span class="hint">音声だけを取り出して小さくします（PCの外には送信しません）</span></h2>
+      <h2><span class="n">1</span>録画した動画を選ぶ<span class="hint">音声だけを取り出して小さくします</span></h2>
       <div class="drop" id="drop">ここに動画ファイルをドラッグ＆ドロップ<br>またはクリックして選択（複数可・.mp4 など）</div>
       <input type="file" id="convFile" accept="video/*,audio/*,.mp4,.m4a,.mov,.webm,.mp3,.wav" multiple class="hide">
       <div class="settings" style="grid-template-columns:auto 1fr">
         <span class="k">保存先</span>
         <div class="radio">
+          <label class="onlySheet"><input type="radio" name="save2" value="sheet"> スプシに登録</label>
           <label><input type="radio" name="save2" value="download"> ダウンロード</label>
           <label class="onlyFolder"><input type="radio" name="save2" value="folder"> フォルダを選ぶ</label>
         </div>
@@ -199,9 +226,18 @@
   <!-- ===== 完了 ===== -->
   <section class="card hide" id="doneCard">
     <h2><span class="n">3</span>Claude に議事録を依頼</h2>
-    <ol class="steps">
+    <div id="upBox" class="hide">
+      <div class="small" id="upMsg"></div>
+      <div class="prog"><i id="upProg"></i></div>
+      <div class="btnrow" id="upFail" style="margin-top:0"></div>
+    </div>
+    <ol class="steps" id="stepsLocal">
       <li>［依頼文をコピー］を押す</li>
       <li>Claude に貼り付け、保存された音声ファイル <b id="doneFile"></b> を添付して送信</li>
+    </ol>
+    <ol class="steps hide" id="stepsSheet">
+      <li>スプシの「録音一覧」に、音声ファイルのリンクと依頼文が登録されました <a id="sheetLink" target="_blank" rel="noopener">スプシを開く</a></li>
+      <li>PCでスプシの依頼文を Claude に貼り付け、リンク先の音声ファイルを添付して送信</li>
     </ol>
     <textarea id="req" readonly></textarea>
     <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">
@@ -1768,6 +1804,7 @@ function requestText(o){
 }
 async function showDone(files, text){
   $('doneFile').textContent=files.join('、');
+  $('upBox').classList.add('hide'); $('stepsSheet').classList.add('hide'); $('stepsLocal').classList.remove('hide');
   $('req').value=text; $('doneCard').classList.remove('hide');
   store.set('lastReq',{files,text});
   $('copyMsg').textContent='';
@@ -1793,7 +1830,89 @@ const radiosA=[...document.querySelectorAll('input[name=save]')], radiosB=[...do
 function syncSave(v){ [...radiosA,...radiosB].forEach(r=>r.checked=r.value===v); store.set('saveMode',v); }
 [...radiosA,...radiosB].forEach(r=>r.onchange=()=>syncSave(r.value));
 syncSave(store.get('saveMode','download'));
+setTimeout(()=>refreshCfgUI(),0);
 const saveMode=()=>radiosA.find(r=>r.checked).value;
+
+/* ---------- スプシ連携 ---------- */
+const cfg=()=>store.get('sheetCfg',{url:'',key:'',user:''});
+const sheetReady=()=>{ const c=cfg(); return !!(c.url&&c.key); };
+function refreshCfgUI(){
+  const ok=sheetReady();
+  document.body.classList.toggle('noSheet',!ok);
+  $('cfgChip').textContent=ok?'スプシ連携中':'スプシ未設定'; $('cfgChip').classList.toggle('on',ok);
+  if(!ok && saveMode()==='sheet') syncSave('download');
+}
+(function readHashCfg(){
+  const m=location.hash.match(/cfg=([^&]+)/); if(!m) return;
+  try{ const o=JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/-/g,'+').replace(/_/g,'/')))));
+    store.set('sheetCfg',{...cfg(),url:o.u,key:o.k}); store.set('saveMode','sheet');
+    setTimeout(()=>{ const c=cfg(); $('cfgUrl').value=c.url; $('cfgKey').value=c.key; $('cfgUser').value=c.user||''; $('cfgCard').classList.remove('hide'); $('cfgMsg').textContent='設定リンクから連携URLと合言葉を読み込みました。名前を入力して［保存して接続テスト］を押してください。'; },0);
+  }catch(e){}
+  history.replaceState(null,'',location.pathname+location.search);
+})();
+$('btnCfg').onclick=()=>{ const c=cfg(); $('cfgUrl').value=c.url; $('cfgKey').value=c.key; $('cfgUser').value=c.user||''; $('cfgCard').classList.toggle('hide'); };
+$('cfgClose').onclick=()=>$('cfgCard').classList.add('hide');
+$('cfgSave').onclick=async()=>{
+  const c={url:$('cfgUrl').value.trim(),key:$('cfgKey').value.trim(),user:$('cfgUser').value.trim()};
+  store.set('sheetCfg',c); refreshCfgUI();
+  if(!c.url||!c.key){ $('cfgMsg').textContent='連携URLと合言葉を入力してください。'; return; }
+  $('cfgMsg').textContent='接続テスト中…';
+  try{ const j=await gas({action:'ping'}); syncSave('sheet'); refreshCfgUI();
+    $('cfgMsg').textContent=`接続OK：スプシ「${j.sheet}」／保存先フォルダ「${j.folder}」。今後の録音はスプシに登録されます。`; }
+  catch(e){ $('cfgMsg').textContent='接続できません：'+e.message; }
+};
+$('cfgShare').onclick=async()=>{
+  const c={u:$('cfgUrl').value.trim()||cfg().url, k:$('cfgKey').value.trim()||cfg().key};
+  if(!c.u||!c.k){ $('cfgMsg').textContent='先に連携URLと合言葉を入力してください。'; return; }
+  const link=location.origin+location.pathname+'#cfg='+btoa(unescape(encodeURIComponent(JSON.stringify(c)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  try{ await navigator.clipboard.writeText(link); $('cfgMsg').textContent='コピーしました。メンバーに送り、スマホ・PCで一度開いてもらえば設定完了です（社外には送らないでください）。'; }
+  catch(e){ $('cfgMsg').textContent=link; }
+};
+async function gas(o){
+  const c=cfg(); let last;
+  for(let i=0;i<3;i++){
+    try{
+      const r=await fetch(c.url,{method:'POST',body:JSON.stringify({...o,key:c.key})});
+      const j=await r.json(); if(!j.ok) throw Object.assign(new Error(j.error),{fatal:true}); return j;
+    }catch(e){ last=e; if(e.fatal) throw e; await new Promise(r=>setTimeout(r,1500*(i+1))); }
+  }
+  throw new Error('通信できません（電波状況を確認してください）'+(last?.message?'：'+last.message:''));
+}
+const b64=blob=>new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(String(fr.result).split(',')[1]||''); fr.onerror=()=>rej(fr.error); fr.readAsDataURL(blob); });
+async function uploadToSheet(blob,name,meta,prompt,onProg){
+  if(!blob.size) throw new Error('録音データが空です');
+  const CH=4*1048576;
+  const b=await gas({action:'begin',name,mime:(blob.type||'audio/webm').split(';')[0],size:blob.size});
+  let fileId=null;
+  for(let off=0;off<blob.size;off+=CH){
+    const part=blob.slice(off,off+CH);
+    const j=await gas({action:'chunk',id:b.id,offset:off,data:await b64(part)});
+    if(j.done) fileId=j.fileId; onProg(Math.min(1,(off+part.size)/blob.size));
+  }
+  return await gas({action:'finish',id:b.id,fileId,name,meta:{...meta,user:cfg().user||''},prompt});
+}
+function metaNow(o){ const v=id=>$(id).value.trim(); return {when:o.when,kind:o.kind,dur:o.dur||'',name:v('iName'),project:v('iProj'),place:v('iPlace'),ours:v('iOurs'),theirs:v('iTheirs')}; }
+// 録音データをスプシへ送り、結果を完了欄に表示（失敗時は再送・ダウンロードを提示）
+async function sendSheet(blob,name,info,text,sid){
+  $('upBox').classList.remove('hide'); $('upFail').innerHTML=''; $('upProg').style.width='0';
+  $('stepsLocal').classList.add('hide'); $('stepsSheet').classList.add('hide');
+  $('upMsg').textContent=`スプシに登録中…（${mb(blob.size)}）画面を閉じずにお待ちください`;
+  let wake=null; try{ wake=await navigator.wakeLock?.request('screen'); }catch(e){}
+  UPLOADING=true;
+  try{
+    const j=await uploadToSheet(blob,name,metaNow(info),text,p=>$('upProg').style.width=(p*100).toFixed(0)+'%');
+    $('upMsg').textContent=`スプシに登録しました（録音一覧 ${j.row}行目）`; $('upProg').style.width='100%';
+    $('sheetLink').href=j.sheetUrl; $('stepsSheet').classList.remove('hide');
+    const t=text+'\n\n音声ファイル（Googleドライブ）：'+j.fileUrl; $('req').value=t; store.set('lastReq',{files:[name],text:t,sheetUrl:j.sheetUrl});
+    if(sid) await DB.remove(sid);
+  }catch(e){
+    $('upMsg').textContent='スプシに登録できませんでした：'+e.message+'（録音はこの端末に保持しています）';
+    const r=document.createElement('button'); r.className='prim'; r.textContent='再送する'; r.onclick=()=>sendSheet(blob,name,info,text,sid);
+    const d=document.createElement('button'); d.className='sub'; d.textContent='端末にダウンロード'; d.onclick=()=>download(blob,name);
+    $('upFail').append(r,d); $('stepsLocal').classList.remove('hide');
+  }finally{ UPLOADING=false; try{ wake&&wake.release(); }catch(e){} }
+}
+let UPLOADING=false;
 async function chooseDir(){
   if(saveMode()!=='folder' || !window.showDirectoryPicker) return null;
   return await window.showDirectoryPicker({id:'recorder',mode:'readwrite',startIn:'documents'});
@@ -1804,8 +1923,9 @@ async function makeSink(dir,name){
     const fh=await dir.getFileHandle(name,{create:true}); const w=await fh.createWritable(); let chain=Promise.resolve();
     return {name,get size(){return size;},push:b=>{size+=b.size; chain=chain.then(()=>w.write(b)); return chain;},close:async()=>{await chain; await w.close();}};
   }
-  const parts=[];
-  return {name,get size(){return size;},push:b=>{size+=b.size; parts.push(b);},close:async()=>{download(new Blob(parts),name); await new Promise(r=>setTimeout(r,400));}};
+  const parts=[], keep=saveMode()==='sheet';
+  return {name,get size(){return size;},push:b=>{size+=b.size; parts.push(b);},blob:()=>new Blob(parts,{type:parts[0]?.type||''}),
+    close:async()=>{ if(keep) return; download(new Blob(parts),name); await new Promise(r=>setTimeout(r,400));}};
 }
 function download(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),60000); }
 
@@ -1830,9 +1950,11 @@ async function checkRecover(){
   const b1=document.createElement('button'); b1.className='sub'; b1.style.marginLeft='8px'; b1.textContent='復元して保存';
   const b2=document.createElement('button'); b2.className='sub'; b2.style.marginLeft='6px'; b2.textContent='破棄';
   b1.onclick=async()=>{ const parts=await DB.chunks(s.sid); const name=`${s.base}_audio.${s.ext||'webm'}`;
-    if(parts.length) download(new Blob(parts),name);
-    await DB.remove(s.sid); checkRecover();
-    showDone([name], requestText({files:[name], kind:s.kind, when:s.when, marks:s.marks||[]})); };
+    const blob=new Blob(parts,{type:parts[0]?.type||''}), info={kind:s.kind, when:s.when}, text=requestText({files:[name], ...info, marks:s.marks||[]});
+    box.classList.remove('show'); await showDone([name], text);
+    if(sheetReady()&&parts.length){ await sendSheet(blob,name,info,text,s.sid); }
+    else{ if(parts.length) download(blob,name); await DB.remove(s.sid); }
+    checkRecover(); };
   b2.onclick=async()=>{ if(!confirm('前回の録音データを破棄しますか？')) return; await DB.remove(s.sid); checkRecover(); };
   box.append(b1,b2);
 }
@@ -1842,7 +1964,7 @@ if(window.indexedDB) checkRecover();
 const IS_MOBILE=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.maxTouchPoints>1&&/Macintosh/.test(navigator.userAgent));
 if(IS_MOBILE) document.body.classList.add('isMobile');
 if(!navigator.mediaDevices?.getDisplayMedia || IS_MOBILE) document.body.classList.add('noScreen');
-if(!window.showDirectoryPicker){ document.body.classList.add('noFolder'); syncSave('download'); }
+if(!window.showDirectoryPicker){ document.body.classList.add('noFolder'); if(saveMode()==='folder') syncSave('download'); }
 if(!window.isSecureContext || !navigator.mediaDevices?.getUserMedia){
   show('alert', IS_MOBILE
     ? 'このままではスマホのマイクを使えません。\nスマホではファイルを直接開くとマイクが使えないため、https で始まるアドレス（社内サーバー等）に置いたこのページを開いてください。'
@@ -1935,7 +2057,7 @@ async function begin(mode){
       vr.ondataavailable=e=>{ if(e.data.size) vSink.push(e.data); }; vr.start(SLICE_MS); recs.push(vr);
     }
     let wake=null; try{ wake=await navigator.wakeLock?.request('screen'); }catch(e){}
-    S={ext,face,kind,dir,ctx,an,recs,sinks,stops,wake,base,sid,t0,before:0,since:Date.now(),paused:false,marks:[],loudAt:Date.now()};
+    S={sheet:saveMode()==='sheet',ext,face,kind,dir,ctx,an,recs,sinks,stops,wake,base,sid,t0,before:0,since:Date.now(),paused:false,marks:[],loudAt:Date.now()};
     $('markList').innerHTML=''; pushHist(); ui(true); tick(); meter();
     document.addEventListener('visibilitychange',rewake);
   }catch(e){
@@ -1953,10 +2075,12 @@ async function finish(){
   const t1=new Date(), when=`${jdate(s.t0)} ${hm(s.t0)}～${hm(t1)}`;
   try{
     for(const k of s.sinks) await k.close();
-    await DB.remove(s.sid);
-    const files=[`${s.base}_audio.${s.ext}`];
+    const files=[`${s.base}_audio.${s.ext}`], info={kind:s.kind, when, dur:fmt(elapsed(s))};
+    const text=requestText({files, ...info, marks:s.marks});
     S=null; ui(false);
-    showDone(files, requestText({files, kind:s.kind, when, dur:fmt(elapsed(s)), marks:s.marks}));
+    await showDone(files, text);
+    if(s.sheet) await sendSheet(s.sinks[0].blob(), files[0], info, text, s.sid);
+    else await DB.remove(s.sid);
   }catch(e){ S=null; ui(false); show('alert','保存に失敗しました。ページを開き直すと「復元して保存」できます：'+e.message); }
 }
 const elapsed=s=>s.before+(s.paused?0:Date.now()-s.since);
@@ -1985,7 +2109,7 @@ $('btnOnline').onclick=()=>begin('online');
 $('btnFace').onclick=()=>begin('face');
 $('btnStop').onclick=finish;
 $('optVideo').checked=store.get('video',false); $('optVideo').onchange=()=>store.set('video',$('optVideo').checked);
-window.addEventListener('beforeunload',e=>{ if(S||CONVERTING){ e.preventDefault(); e.returnValue=''; } });
+window.addEventListener('beforeunload',e=>{ if(S||CONVERTING||UPLOADING){ e.preventDefault(); e.returnValue=''; } });
 
 /* ---------- 動画 → 音声変換 ---------- */
 let CONVERTING=false;
@@ -1999,7 +2123,7 @@ async function convertAll(files){
   if(CONVERTING||!files.length) return; show('alert','');
   let dir=null; try{ dir=await chooseDir(); }catch(e){ return; }
   CONVERTING=true; files.sort((a,b)=>a.name.localeCompare(b.name,'ja'));
-  const names=[];
+  const names=[], blobs=[];
   for(const f of files){
     const row=document.createElement('div'); row.innerHTML='<div class="small"></div><div class="prog"><i></i></div>'; $('convList').prepend(row);
     const msg=t=>row.firstChild.textContent=`${f.name}：${t}`, prog=p=>row.lastChild.firstChild.style.width=(p*100).toFixed(1)+'%';
@@ -2007,12 +2131,17 @@ async function convertAll(files){
       msg('変換中…'); const blob=await toOpusWebm(f,prog);
       const name=f.name.replace(/\.[^.]+$/,'')+'_audio.webm';
       const k=await makeSink(dir,name); k.push(blob); await k.close();
-      names.push(name); prog(1); msg(`完了 → ${name}（${mb(blob.size)}）`);
+      names.push(name); blobs.push(blob); prog(1); msg(`変換完了 → ${name}（${mb(blob.size)}）`);
     }catch(e){ msg('失敗：'+(e.message||e)); }
   }
   if(names.length){
     const d=new Date(files[0].lastModified); pushHist();
-    showDone(names, requestText({files:names, kind:'録画から変換', when:`${jdate(d)}（録画ファイルの更新日時 ${hm(d)}）`}));
+    const info={kind:'録画から変換', when:`${jdate(d)}（録画ファイルの更新日時 ${hm(d)}）`};
+    for(let i=0;i<names.length;i++){
+      const text=requestText({files:[names[i]], ...info});
+      await showDone([names[i]], text);
+      if(saveMode()==='sheet') await sendSheet(blobs[i], names[i], info, text, null);
+    }
   }
   CONVERTING=false;
 }
