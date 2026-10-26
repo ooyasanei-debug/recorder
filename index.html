@@ -168,6 +168,7 @@
 <path d="M52 16a8 8 0 0 0 16 0"/><rect x="56" y="4" width="8" height="14" rx="4"/><path d="M60 24v3"/>
 <path d="M36 10q-4 6 0 12M84 10q4 6 0 12"/></g></svg>対面打合せ<small>マイクで録音</small></button>
       </div>
+      <div class="small onlyScreen" style="margin-top:8px">オンライン会議：共有画面で「システム音声も共有する」をオンにして［共有］</div>
       <div class="settings">
         <span class="k">マイク</span>
         <select id="mic"><option value="">既定のマイク（端末内蔵など）</option></select>
@@ -1760,7 +1761,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
 "use strict";
 const $ = id => document.getElementById(id);
 const AUDIO_BPS = 48000, VIDEO_BPS = 1500000, SLICE_MS = 5000, CONV_BPS = 32000;
-/*@@CFG*/const BUILTIN_CFG={"url":"https://script.google.com/macros/s/AKfycbyCA19zpRx_RYNNywKTAcD3fLRpADKfZEwVtOi7wCe7Y_bjL3NQVDlvvnmgNQVfR8dl/exec","key":"sanei26rec"};/*CFG@@*/
+/*@@CFG*/const BUILTIN_CFG={"url":"","key":""};/*CFG@@*/
 const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
                 set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
 const pad = n => String(n).padStart(2,'0');
@@ -2092,7 +2093,17 @@ const MIC_HELP=`確認してください：
 4. 改善しない場合は、会社の情報システム担当に「ブラウザでマイクが使えない」と相談`;
 async function getMic(face){
   const base={channelCount:1,echoCancellation:!face,noiseSuppression:true,autoGainControl:true};
-  const id=$('mic').value, tries=[];
+  let id=$('mic').value; const tries=[];
+  // オンライン会議でマイクが「既定」のとき、Bluetoothイヤホンのマイクは避ける
+  // （使うとイヤホンが通話モードに切り替わり、PCの音を取り込めなくなるため）
+  if(!id && !face){
+    try{
+      const ins=(await navigator.mediaDevices.enumerateDevices()).filter(d=>d.kind==='audioinput'&&d.deviceId&&!/^(default|communications)$/.test(d.deviceId));
+      const BT=/Hands-?Free|ハンズフリー|Bluetooth|AG Audio|OpenFit|Shokz|AirPods|Buds/i;
+      const def=(await navigator.mediaDevices.enumerateDevices()).find(d=>d.kind==='audioinput'&&d.deviceId==='default');
+      if(def && BT.test(def.label)){ const alt=ins.find(d=>!BT.test(d.label)); if(alt) id=alt.deviceId; }
+    }catch(e){}
+  }
   if(id) tries.push({audio:{...base,deviceId:{exact:id}}});
   tries.push({audio:base},{audio:true});
   let last;
@@ -2119,6 +2130,36 @@ $('btnMicTest').onclick=async()=>{
   }catch(e){ show('alert',e.message); }
 };
 
+/* ---------- 画面共有（相手の声） ---------- */
+// 共有画面は常に［画面全体］を最初に表示し、「システム音声も共有する」を出す
+function shareOpt(){
+  return {video:{frameRate:5,displaySurface:'monitor'},audio:true,
+    systemAudio:'include',selfBrowserSurface:'exclude',surfaceSwitching:'include',monitorTypeSurfaces:'include'};
+}
+let SHARE_FAILS=0;
+async function shareScreen(){
+  try{
+    const d=await navigator.mediaDevices.getDisplayMedia(shareOpt());
+    SHARE_FAILS=0;
+    return d;
+  }catch(e){
+    if(e.name!=='NotReadableError') throw e;
+    // 「Could not start audio source」：WindowsからPCの音（再生デバイス）を取り込めなかった
+    SHARE_FAILS++;
+    throw Object.assign(new Error(SHARE_FAILS===1
+      ? 'PCの音声（Teams等の音）を取り込めませんでした。Bluetoothイヤホンを使っている場合、イヤホンのマイクを使うと通話モードに切り替わり、PCの音を取り込めなくなります。\n・Teamsの［設定］→［デバイス］で、マイクを「PCの内蔵マイク」、スピーカーをイヤホンにする\n・このツールの［マイク］も「PCの内蔵マイク」を選ぶ\nその後、もう一度［オンライン会議］を押してください。'
+      : 'まだPCの音声を取り込めません。Windowsの［設定］→［システム］→［サウンド］で、出力をイヤホンの「Hands-Free（ハンズフリー）」側に切り替えてから、もう一度［オンライン会議］を押してください。'),{share:true});
+  }
+}
+// ステレオミキサー等（PCの再生音を録れる入力）があれば使う
+async function loopbackMic(){
+  try{
+    const d=(await navigator.mediaDevices.enumerateDevices()).find(x=>x.kind==='audioinput' && /ステレオ\s*ミキサー|Stereo\s*Mix|What U Hear|CABLE Output|ループバック|loopback/i.test(x.label));
+    if(!d) return null;
+    return await navigator.mediaDevices.getUserMedia({audio:{deviceId:{exact:d.deviceId},echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+  }catch(e){ return null; }
+}
+
 /* ---------- 録音 ---------- */
 let S=null;
 async function begin(mode){
@@ -2135,11 +2176,17 @@ async function begin(mode){
     let display=null;
     if(!face){
       if(!mic && !confirm('マイクが使えないため、自分の声は録音されません。相手の音声だけで録音しますか？')) throw new Error('キャンセルしました');
-      display=await navigator.mediaDevices.getDisplayMedia({video:{frameRate:10},audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},systemAudio:'include',selfBrowserSurface:'exclude'});
-      stops.push(...display.getTracks());
-      if(display.getAudioTracks().length){ const d=ctx.createMediaStreamSource(new MediaStream(display.getAudioTracks())); d.connect(mix); d.connect(an); }
-      else show('alert','共有した画面に音声がありません。相手の声を録るには、共有時に「タブの音声も共有する」または「システム音声を共有する」をオンにしてください（今は自分のマイクのみ録音中）。');
-      display.getVideoTracks()[0].addEventListener('ended',()=>finish());
+      const loop=!$('optVideo').checked && mic ? await loopbackMic() : null;   // ステレオミキサー等があれば画面共有なしで相手の声を録る
+      if(loop){ stops.push(...loop.getTracks()); const l=ctx.createMediaStreamSource(loop); l.connect(mix); l.connect(an); }
+      else display=await shareScreen();
+      if(display){
+        stops.push(...display.getTracks());
+        if(display.getAudioTracks().length){ const d=ctx.createMediaStreamSource(new MediaStream(display.getAudioTracks())); d.connect(mix); d.connect(an); }
+        else if(!confirm('「システム音声も共有する」がオフのため、相手の声が録音されません。\n\n［OK］自分のマイクだけで録音する\n［キャンセル］やり直す（もう一度［オンライン会議］を押し、オンにして共有）')){
+          throw Object.assign(new Error('共有をやり直してください：［オンライン会議］→［画面全体］→「システム音声も共有する」をオン →［共有］'),{share:true});
+        }
+        display.getVideoTracks()[0].addEventListener('ended',()=>finish());
+      }
     }
     const t0=new Date();
     const base=`${stamp(t0)}_${face?'対面':'オンライン'}${safe($('iName').value)?'_'+safe($('iName').value):''}`;
@@ -2150,7 +2197,7 @@ async function begin(mode){
     const ar=new MediaRecorder(mix.stream,{...(aMime?{mimeType:aMime}:{}),audioBitsPerSecond:AUDIO_BPS});
     ar.ondataavailable=e=>{ if(e.data.size){ aSink.push(e.data); DB.addChunk(sid,e.data); } };
     ar.start(SLICE_MS); recs.push(ar);
-    if(!face && $('optVideo').checked){
+    if(!face && display && $('optVideo').checked){
       const vSink=await makeSink(dir,`${base}_video.webm`); sinks.push(vSink);
       const vr=new MediaRecorder(new MediaStream([...display.getVideoTracks(),...mix.stream.getAudioTracks()]),{mimeType:pickMime(['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm']),videoBitsPerSecond:VIDEO_BPS,audioBitsPerSecond:AUDIO_BPS});
       vr.ondataavailable=e=>{ if(e.data.size) vSink.push(e.data); }; vr.start(SLICE_MS); recs.push(vr);
@@ -2161,7 +2208,7 @@ async function begin(mode){
     document.addEventListener('visibilitychange',rewake);
   }catch(e){
     stops.forEach(t=>t.stop());
-    if(e.name!=='NotAllowedError'||e.mic) show('alert','録音を開始できませんでした。'+(e.mic?'\n'+e.message:e.message));
+    if(e.name!=='NotAllowedError'||e.mic) show('alert','録音を開始できませんでした。'+((e.mic||e.share)?'\n':'')+e.message);
   }
 }
 async function rewake(){ if(S&&document.visibilityState==='visible'&&(!S.wake||S.wake.released)){ try{ S.wake=await navigator.wakeLock.request('screen'); }catch(e){} } }
