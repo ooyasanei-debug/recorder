@@ -1776,7 +1776,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
 "use strict";
 const $ = id => document.getElementById(id);
 const AUDIO_BPS = 48000, VIDEO_BPS = 1500000, SLICE_MS = 5000, CONV_BPS = 32000;
-/*@@CFG*/const BUILTIN_CFG={"url":"","key":""};/*CFG@@*/
+/*@@CFG*/const BUILTIN_CFG={"url":"https://script.google.com/macros/s/AKfycbyCA19zpRx_RYNNywKTAcD3fLRpADKfZEwVtOi7wCe7Y_bjL3NQVDlvvnmgNQVfR8dl/exec","key":"sanei26rec","names":["大屋","高木","村上","長尾","蓑田","藤田","川村","湯淺"]};/*CFG@@*/
 const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
                 set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
 const pad = n => String(n).padStart(2,'0');
