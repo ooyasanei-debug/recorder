@@ -119,7 +119,7 @@
 <body>
 <main>
   <header>
-    <h1>会議録音・議事録作成ツール <span class="ver" id="appVer">ver.11</span></h1>
+    <h1>会議録音・議事録作成ツール <span class="ver" id="appVer">ver.12</span></h1>
     <div class="tabs">
       <button class="tab on" data-tab="rec">録音する</button>
       <button class="tab" data-tab="smv">SMILE V 議事録</button>
@@ -1776,7 +1776,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
 "use strict";
 const $ = id => document.getElementById(id);
 const AUDIO_BPS = 48000, VIDEO_BPS = 1500000, SLICE_MS = 5000, CONV_BPS = 32000;
-/*@@CFG*/const BUILTIN_CFG={"url":"https://script.google.com/macros/s/AKfycbyCA19zpRx_RYNNywKTAcD3fLRpADKfZEwVtOi7wCe7Y_bjL3NQVDlvvnmgNQVfR8dl/exec","key":"sanei26rec","names":["大屋","高木","村上","長尾","蓑田","藤田","川村","湯淺"]};/*CFG@@*/
+/*@@CFG*/const BUILTIN_CFG={"url":"","key":""};/*CFG@@*/
 const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
                 set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
 const pad = n => String(n).padStart(2,'0');
@@ -1897,7 +1897,7 @@ $('btnNext').onclick=()=>{
   window.scrollTo({top:0,behavior:'smooth'});
 };
 /* ---------- 音声のダウンロード（録音直後は端末内のデータ、以前の分はGoogleドライブ） ---------- */
-const APP_VER='ver.11';
+const APP_VER='ver.12';
 const driveDl=id=>'https://drive.google.com/uc?export=download&id='+encodeURIComponent(id);
 let LAST=null;
 function dlBtn(){ $('btnDl').classList.toggle('hide',!(LAST&&(LAST.blob||LAST.id))); }
@@ -1948,7 +1948,10 @@ setTimeout(()=>refreshCfgUI(),0);
 const saveMode=()=>radiosA.find(r=>r.checked).value;
 
 /* ---------- スプシ連携 ---------- */
-const cfg=()=>{ const c=store.get('sheetCfg',{}); return {url:c.url||BUILTIN_CFG.url, key:c.key||BUILTIN_CFG.key, user:store.get('userName','')||c.user||''}; };
+// ファイルに埋め込んだ設定を最優先（端末に残った古い連携URLは使わない）
+const HAS_BUILTIN=!!(BUILTIN_CFG.url&&BUILTIN_CFG.key);
+if(HAS_BUILTIN){ try{ const o=store.get('sheetCfg',null); if(o&&(o.url||o.key)){ localStorage.removeItem('sheetCfg'); localStorage.removeItem('members'); } }catch(e){} }
+const cfg=()=>{ const c=HAS_BUILTIN?{}:store.get('sheetCfg',{}); return {url:HAS_BUILTIN?BUILTIN_CFG.url:(c.url||''), key:HAS_BUILTIN?BUILTIN_CFG.key:(c.key||''), user:store.get('userName','')||c.user||''}; };
 const sheetReady=()=>{ const c=cfg(); return !!(c.url&&c.key); };
 function refreshCfgUI(){
   const ok=sheetReady();
@@ -1984,17 +1987,17 @@ $('nameSel').onchange=()=>{ const v=$('nameSel').value; if(!v) return;
   history.replaceState(null,'',location.pathname+location.search);
 })();
 setTimeout(askName,0);
-$('btnCfg').onclick=async()=>{ const c=store.get('sheetCfg',{}); $('cfgUrl').value=c.url||BUILTIN_CFG.url; $('cfgKey').value=c.key||BUILTIN_CFG.key;
+$('btnCfg').onclick=async()=>{ const c=store.get('sheetCfg',{}); $('cfgUrl').value=cfg().url; $('cfgKey').value=cfg().key;
   $('cfgCard').classList.toggle('hide'); $('cfgMsg').textContent='';
   if(sheetReady()){ const q=quickMembers(); if(q) fillSel($('cfgUser'),q,cfg().user); try{ fillSel($('cfgUser'),await loadMembers(),cfg().user); }catch(e){ $('cfgMsg').textContent='名前の一覧を読み込めません：'+e.message; } } };
 $('cfgClose').onclick=()=>$('cfgCard').classList.add('hide');
 $('cfgUser').onchange=()=>{ const v=$('cfgUser').value; if(!v) return; store.set('userName',v); refreshCfgUI(); $('cfgMsg').textContent='名前を「'+v+'」にしました。SMILE V 転記のブックマークは登録し直してください。'; };
 $('cfgSave').onclick=async()=>{
   const c={url:$('cfgUrl').value.trim(),key:$('cfgKey').value.trim()};
-  store.set('sheetCfg',c); MEMBERS=null; refreshCfgUI();
+  if(!HAS_BUILTIN) store.set('sheetCfg',c); MEMBERS=null; refreshCfgUI();
   if(!c.url||!c.key){ $('cfgMsg').textContent='連携URLと合言葉を入力してください。'; return; }
   $('cfgMsg').textContent='接続テスト中…';
-  try{ const j=await gas({action:'ping'}); syncSave('sheet'); refreshCfgUI();
+  try{ const j=await gas({action:'ping'},c); syncSave('sheet'); refreshCfgUI();
     $('cfgMsg').textContent=`接続OK：スプシ「${j.sheet}」／保存先フォルダ「${j.folder}」／メンバー ${j.members}人／ツール ${APP_VER}・スプシ側 ${j.ver||'ver.10以前（要更新）'}`;
     fillSel($('cfgUser'),await loadMembers(),cfg().user); }
   catch(e){ $('cfgMsg').textContent='接続できません：'+e.message; }
@@ -2003,7 +2006,7 @@ $('cfgBake').onclick=async()=>{
   const c={url:$('cfgUrl').value.trim(),key:$('cfgKey').value.trim()};
   if(!c.url||!c.key){ $('cfgMsg').textContent='連携URLと合言葉を入力してください。'; return; }
   try{
-    MEMBERS=null; c.names=await loadMembers();   // メンバーの名前もファイルに入れておく（初回の表示を速く）
+    MEMBERS=null; c.names=(await gas({action:'members'},c)).names||[];   // メンバーの名前もファイルに入れておく（初回の表示を速く）
     const src=await (await fetch(location.href.split('#')[0],{cache:'no-store'})).text();
     if(!/\/\*@@CFG\*\/[\s\S]*?\/\*CFG@@\*\//.test(src)) throw new Error('ページの読み込みに失敗しました');
     const out=src.replace(/\/\*@@CFG\*\/[\s\S]*?\/\*CFG@@\*\//,'/*@@CFG*/const BUILTIN_CFG='+JSON.stringify(c)+';/*CFG@@*/');
@@ -2013,8 +2016,8 @@ $('cfgBake').onclick=async()=>{
 };
 window.SMV={ url:'http://smile-server/vwebapp/001/WFL/OSK.X1.WFL.X10010/90/' };   // SMILE V 打合議事録
 window.SHEET={ ready:()=>sheetReady(), user:()=>cfg().user, cfg:()=>{ const c=cfg(); return {url:c.url,key:c.key}; }, gas:o=>gas(o) };
-async function gas(o){
-  const c=cfg(); let last;
+async function gas(o,cc){
+  const c=cc||cfg(); let last;
   if(!/^https:\/\/script\.google\.com\/(a\/macros\/[^/]+\/|macros\/)s\/[^/]+\/exec$/.test(c.url))
     throw Object.assign(new Error('連携URLの形が違います。「https://script.google.com/macros/s/（長い英数字）/exec」の形で、最後が /exec のURLを入れてください（/dev や /edit で終わるURLは使えません）'),{fatal:true});
   for(let i=0;i<3;i++){
