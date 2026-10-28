@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>会議録音ツール</title>
+<title>会議録音・議事録作成ツール</title>
 <style>
   :root{--bg:#f4f5f7;--card:#fff;--ink:#1d2330;--sub:#5d6575;--line:#d9dde4;--blue:#2457c5;--green:#1f8a4c;--red:#c62f2f;--amber:#a86a12;--soft:#eef1f5}
   *{box-sizing:border-box}
@@ -99,8 +99,14 @@
   .up{margin-top:10px}
   .noSheet .onlySheet{display:none!important}
   @media (max-width:640px){#cfgCard .grid{grid-template-columns:1fr}}
-  .noScreen .online,.noScreen .onlyScreen,.noFolder .onlyFolder{display:none!important}
-  .noScreen .modes{grid-template-columns:1fr}
+  .noScreen:not(.isMobile) .online,.noScreen .onlyScreen,.noFolder .onlyFolder{display:none!important}
+  .noScreen:not(.isMobile) .modes{grid-template-columns:1fr}
+  .ver{font-size:12px;font-weight:normal;color:var(--sub);background:var(--soft);border-radius:999px;padding:2px 8px;vertical-align:middle}
+  .mbOnly{display:none} .isMobile .mbOnly{display:inline} .isMobile .pcOnly{display:none}
+  .hitem{border-top:1px solid var(--line);padding:10px 0}
+  .hitem .btnrow{margin-top:6px}
+  .hitem textarea{margin-top:6px;min-height:120px;font-size:12px;background:var(--soft)}
+  a.sub{display:inline-block;text-decoration:none;border-radius:8px;font-size:15px}
   .mobileNote{display:none;margin-top:10px;font-size:12px;color:var(--sub)}
   .isMobile .mobileNote{display:block}
   .isMobile .tab[data-tab=smv]{display:none}
@@ -113,7 +119,7 @@
 <body>
 <main>
   <header>
-    <h1>会議録音ツール</h1>
+    <h1>会議録音・議事録作成ツール <span class="ver" id="appVer">ver.11</span></h1>
     <div class="tabs">
       <button class="tab on" data-tab="rec">録音する</button>
       <button class="tab" data-tab="smv">SMILE V 議事録</button>
@@ -161,7 +167,7 @@
         <button class="big online" id="btnOnline"><svg class="ill" viewBox="0 0 120 72" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round">
 <rect x="22" y="6" width="76" height="48" rx="4"/><path d="M12 62h96l-6-8H18z"/>
 <rect x="29" y="13" width="29" height="17" rx="2"/><rect x="62" y="13" width="29" height="17" rx="2"/><rect x="29" y="34" width="29" height="14" rx="2"/><rect x="62" y="34" width="29" height="14" rx="2"/></g>
-<g fill="#fff"><circle cx="43.5" cy="19" r="3"/><path d="M37 28a6.5 5 0 0 1 13 0z"/><circle cx="76.5" cy="19" r="3"/><path d="M70 28a6.5 5 0 0 1 13 0z"/><circle cx="43.5" cy="39" r="2.6"/><path d="M38 47a5.5 4.5 0 0 1 11 0z"/><circle cx="76.5" cy="39" r="2.6"/><path d="M71 47a5.5 4.5 0 0 1 11 0z"/></g></svg>オンライン会議<small>相手の声＋自分のマイク</small></button>
+<g fill="#fff"><circle cx="43.5" cy="19" r="3"/><path d="M37 28a6.5 5 0 0 1 13 0z"/><circle cx="76.5" cy="19" r="3"/><path d="M70 28a6.5 5 0 0 1 13 0z"/><circle cx="43.5" cy="39" r="2.6"/><path d="M38 47a5.5 4.5 0 0 1 11 0z"/><circle cx="76.5" cy="39" r="2.6"/><path d="M71 47a5.5 4.5 0 0 1 11 0z"/></g></svg>オンライン会議<small><span class="pcOnly">相手の声＋自分のマイク</span><span class="mbOnly">PC等のスピーカーの音をスマホで録音</span></small></button>
         <button class="big face" id="btnFace"><svg class="ill" viewBox="0 0 120 72" aria-hidden="true"><g fill="#fff"><circle cx="20" cy="18" r="7"/><path d="M8 46c0-12 6-18 12-18s12 6 12 18z"/><circle cx="100" cy="18" r="7"/><path d="M88 46c0-12 6-18 12-18s12 6 12 18z"/></g>
 <g fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 50h112"/><path d="M14 50v16M106 50v16"/>
 <rect x="44" y="30" width="32" height="20" rx="2"/><path d="M40 50h40"/>
@@ -248,16 +254,25 @@
       <li>依頼文をコピーして Claude に貼り付け、音声ファイル <b id="doneFile"></b> を添付して送信</li>
     </ol>
     <ol class="steps hide" id="stepsSheet">
-      <li>スプシに登録しました <a id="sheetLink" target="_blank" rel="noopener">スプシを開く</a></li>
-      <li>依頼文を Claude に貼り付け、リンク先の音声ファイルを添付して送信</li>
+      <li>［音声をダウンロード］で音声ファイルを保存</li>
+      <li>［依頼文をコピー］→ Claude に貼り付け、保存した音声ファイルを添付して送信</li>
     </ol>
     <textarea id="req" readonly></textarea>
     <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap">
+      <button class="sub" id="btnDl">音声をダウンロード</button>
       <button class="copy" id="btnCopy">依頼文をコピー</button>
       <span class="small" id="copyMsg"></span>
       <button class="sub" id="toSmv">SMILE V 議事録へ</button>
       <button class="sub" id="btnNext" style="margin-left:auto">クリアして次の会議へ</button>
     </div>
+  </section>
+  <section class="card onlySheet" id="histCard">
+    <details id="histBox">
+      <summary><b>これまでの自分の録音</b> <span class="small">音声のダウンロード・依頼文のコピー</span></summary>
+      <div class="btnrow"><button class="sub" id="histReload">再読み込み</button><span class="small" id="histMsg"></span></div>
+      <div class="small" style="margin-top:6px">音声はGoogleドライブから保存します。メンバー表に登録したGoogleアカウントでログインしている必要があります。</div>
+      <div id="histList"></div>
+    </details>
   </section>
   <div id="tab-smv" class="hide"><iframe id="smvFrame" title="SMILE V 議事録"></iframe></div>
 </main>
@@ -1761,7 +1776,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
 "use strict";
 const $ = id => document.getElementById(id);
 const AUDIO_BPS = 48000, VIDEO_BPS = 1500000, SLICE_MS = 5000, CONV_BPS = 32000;
-/*@@CFG*/const BUILTIN_CFG={"url":"https://script.google.com/macros/s/AKfycbyCA19zpRx_RYNNywKTAcD3fLRpADKfZEwVtOi7wCe7Y_bjL3NQVDlvvnmgNQVfR8dl/exec","key":"sanei26rec","names":["大屋","高木","村上","長尾","蓑田","藤田","川村","湯淺"]};/*CFG@@*/
+/*@@CFG*/const BUILTIN_CFG={"url":"","key":""};/*CFG@@*/
 const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
                 set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
 const pad = n => String(n).padStart(2,'0');
@@ -1865,7 +1880,7 @@ async function showDone(files, text){
   $('doneFile').textContent=files.join('、');
   $('upBox').classList.add('hide'); $('stepsSheet').classList.add('hide'); $('stepsLocal').classList.remove('hide');
   $('req').value=text; $('doneCard').classList.remove('hide');
-  store.set('lastReq',{files,text});
+  store.set('lastReq',{files,text}); LAST={name:files[0]}; dlBtn();
   $('copyMsg').textContent='';
   try{ await navigator.clipboard.writeText(text); $('copyMsg').textContent='コピー済みです。Claude に貼り付けてください。'; }catch(e){}
   $('doneCard').scrollIntoView({behavior:'smooth',block:'start'});
@@ -1881,8 +1896,48 @@ $('btnNext').onclick=()=>{
   INFO.forEach(id=>$(id).value=''); saveInfo();
   window.scrollTo({top:0,behavior:'smooth'});
 };
+/* ---------- 音声のダウンロード（録音直後は端末内のデータ、以前の分はGoogleドライブ） ---------- */
+const APP_VER='ver.11';
+const driveDl=id=>'https://drive.google.com/uc?export=download&id='+encodeURIComponent(id);
+let LAST=null;
+function dlBtn(){ $('btnDl').classList.toggle('hide',!(LAST&&(LAST.blob||LAST.id))); }
+$('btnDl').onclick=()=>{
+  if(LAST&&LAST.blob) download(LAST.blob,LAST.name);
+  else if(LAST&&LAST.id) window.open(driveDl(LAST.id),'_blank');
+};
 const last=store.get('lastReq',null);
+LAST=last?{name:(last.files||[])[0],id:last.fileId||''}:null;
+dlBtn();
 if(last){ $('doneFile').textContent=last.files.join('、'); $('req').value=last.text; $('doneCard').classList.remove('hide'); $('doneCard').querySelector('h2').lastChild.textContent='前回の録音を Claude に依頼'; }
+
+/* ---------- これまでの自分の録音 ---------- */
+let HIST_LOADED=false, HIST_ITEMS=[];
+const escH=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function loadMine(){
+  const user=cfg().user;
+  if(!user){ $('histMsg').textContent='名前が未選択です（右上の ⚙ で選んでください）'; return; }
+  $('histMsg').textContent='読み込み中…'; $('histList').innerHTML='';
+  try{
+    const j=await gas({action:'mine',user});
+    HIST_ITEMS=j.items||[]; HIST_LOADED=true;
+    $('histMsg').textContent=HIST_ITEMS.length?`${user} さんの録音 ${HIST_ITEMS.length} 件（新しい順）`:`${user} さんの録音はまだありません`;
+    $('histList').innerHTML=HIST_ITEMS.map((it,i)=>`<div class="hitem">
+      <div><b>${escH(it.name||it.project||'（会議名なし）')}</b> <span class="small">${escH(it.when||it.at)}${it.dur?'　'+escH(it.dur):''}${it.kind?'　'+escH(it.kind):''}</span></div>
+      <div class="btnrow">${it.id?`<a class="sub" href="${driveDl(it.id)}" target="_blank" rel="noopener">音声をダウンロード</a>`:'<span class="small">音声なし</span>'}
+        <button class="sub" data-cp="${i}">依頼文をコピー</button><button class="link" data-sh="${i}">依頼文を表示</button><span class="small" data-msg="${i}"></span></div>
+      <textarea class="hide" readonly data-tx="${i}"></textarea></div>`).join('');
+  }catch(e){
+    $('histMsg').textContent=/不明な操作/.test(e.message)?'スプシ側（Apps Script）が古い版です。管理者に「最新の .gs に置き換えて新バージョンでデプロイ」を依頼してください。':'読み込めませんでした：'+e.message;
+  }
+}
+$('histBox').addEventListener('toggle',()=>{ if($('histBox').open && !HIST_LOADED) loadMine(); });
+$('histReload').onclick=loadMine;
+$('histList').onclick=async e=>{
+  const c=e.target.dataset.cp, sh=e.target.dataset.sh;
+  if(c!=null){ const t=HIST_ITEMS[c].prompt||''; try{ await navigator.clipboard.writeText(t); }catch(_){ const ta=document.querySelector(`[data-tx="${c}"]`); ta.value=t; ta.classList.remove('hide'); ta.select(); document.execCommand('copy'); }
+    document.querySelector(`[data-msg="${c}"]`).textContent='コピーしました'; }
+  if(sh!=null){ const ta=document.querySelector(`[data-tx="${sh}"]`); ta.value=HIST_ITEMS[sh].prompt||''; ta.classList.toggle('hide'); }
+};
 
 /* ---------- 保存先 ---------- */
 const radiosA=[...document.querySelectorAll('input[name=save]')], radiosB=[...document.querySelectorAll('input[name=save2]')];
@@ -1940,7 +1995,7 @@ $('cfgSave').onclick=async()=>{
   if(!c.url||!c.key){ $('cfgMsg').textContent='連携URLと合言葉を入力してください。'; return; }
   $('cfgMsg').textContent='接続テスト中…';
   try{ const j=await gas({action:'ping'}); syncSave('sheet'); refreshCfgUI();
-    $('cfgMsg').textContent=`接続OK：スプシ「${j.sheet}」／保存先フォルダ「${j.folder}」／メンバー ${j.members}人`;
+    $('cfgMsg').textContent=`接続OK：スプシ「${j.sheet}」／保存先フォルダ「${j.folder}」／メンバー ${j.members}人／ツール ${APP_VER}・スプシ側 ${j.ver||'ver.10以前（要更新）'}`;
     fillSel($('cfgUser'),await loadMembers(),cfg().user); }
   catch(e){ $('cfgMsg').textContent='接続できません：'+e.message; }
 };
@@ -2004,9 +2059,11 @@ async function sendSheet(blob,name,info,text,sid){
   UPLOADING=true;
   try{
     const j=await uploadToSheet(blob,name,metaNow(info),text,p=>$('upProg').style.width=(p*100).toFixed(0)+'%');
-    $('upMsg').textContent=`スプシに登録しました（録音一覧 ${j.row}行目）`+(j.shared?'':' ※名前がメンバー表にないため、この音声は管理者しか開けません。管理者に連絡してください。'); $('upProg').style.width='100%';
-    $('sheetLink').href=j.sheetUrl; $('stepsSheet').classList.remove('hide');
-    const t=text+'\n\n音声ファイル（Googleドライブ）：'+j.fileUrl; $('req').value=t; store.set('lastReq',{files:[name],text:t,sheetUrl:j.sheetUrl});
+    $('upMsg').textContent=`登録しました（録音一覧 ${j.row}行目）。下の［音声をダウンロード］でいつでも保存できます。`+(j.shared?'':' ※名前がメンバー表にないため、この音声は管理者しか開けません。管理者に連絡してください。'); $('upProg').style.width='100%';
+    $('stepsSheet').classList.remove('hide');
+    const fid=(String(j.fileUrl||'').match(/\/d\/([\w-]+)/)||[])[1]||'';
+    LAST={name,blob,id:fid}; dlBtn(); HIST_LOADED=false;
+    const t=text+'\n\n音声ファイル（Googleドライブ）：'+j.fileUrl; $('req').value=t; store.set('lastReq',{files:[name],text:t,fileId:fid});
     if(sid) await DB.remove(sid);
   }catch(e){
     $('upMsg').textContent='スプシに登録できませんでした：'+e.message+'（録音はこの端末に保持しています）';
@@ -2167,17 +2224,21 @@ async function loopbackMic(){
 let S=null;
 async function begin(mode){
   if(S) return; if(testStop) testStop(); show('alert','');
-  const face=mode==='face';
+  const face=mode==='face', micOnly=face||IS_MOBILE;   // スマホは画面共有ができないため、オンライン会議もマイクで録る
+  if(!face && IS_MOBILE && !store.get('mbOnlineOk',false)){
+    if(!confirm('スマホでのオンライン会議の録音\n\n会議の音声をPCなどのスピーカーから流し、その近くにこのスマホを置いて録音します（相手の声と自分の声をまとめて録音）。\n\n※同じスマホでTeams等に参加している間は、スマホの仕組み上このツールでは録音できません。\n\n［OK］で録音を始めます。')) return;
+    store.set('mbOnlineOk',true);
+  }
   let dir=null; try{ dir=await chooseDir(); }catch(e){ return; }
   const stops=[];
   try{
     const ctx=new AudioContext(); if(ctx.state==='suspended') await ctx.resume(); const mix=ctx.createMediaStreamDestination(), an=ctx.createAnalyser(); an.fftSize=512;
     let mic=null, micErr=null;
-    try{ mic=await getMic(face); }catch(e){ micErr=e; }
-    if(face&&!mic) throw micErr;
+    try{ mic=await getMic(micOnly); }catch(e){ micErr=e; }
+    if(micOnly&&!mic) throw micErr;
     if(mic){ mic.getAudioTracks()[0].addEventListener('ended',()=>{ if(S){ show('alert','マイクが切断されたため録音が止まりました。［停止］を押して、ここまでの録音を保存してください。'); } }); stops.push(...mic.getTracks()); const m=ctx.createMediaStreamSource(mic); m.connect(mix); m.connect(an); }
     let display=null;
-    if(!face){
+    if(!micOnly){
       if(!mic && !confirm('マイクが使えないため、自分の声は録音されません。相手の音声だけで録音しますか？')) throw new Error('キャンセルしました');
       const loop=!$('optVideo').checked && mic ? await loopbackMic() : null;   // ステレオミキサー等があれば画面共有なしで相手の声を録る
       if(loop){ stops.push(...loop.getTracks()); const l=ctx.createMediaStreamSource(loop); l.connect(mix); l.connect(an); }
@@ -2193,7 +2254,7 @@ async function begin(mode){
     }
     const t0=new Date();
     const base=`${stamp(t0)}_${face?'対面':'オンライン'}${safe($('iName').value)?'_'+safe($('iName').value):''}`;
-    const sid=base+'_'+Date.now(), kind=face?'対面打合せ':'オンライン会議';
+    const sid=base+'_'+Date.now(), kind=face?'対面打合せ':(IS_MOBILE?'オンライン会議（スマホで録音）':'オンライン会議');
     const aMime=pickMime(['audio/webm;codecs=opus','audio/webm','audio/mp4;codecs=mp4a.40.2','audio/mp4']), ext=/mp4/.test(aMime)?'m4a':'webm';
     await DB.putSession({sid,base,ext,kind,when:`${jdate(t0)} ${hm(t0)}～`,marks:[]});
     const aSink=await makeSink(dir,`${base}_audio.${ext}`), recs=[], sinks=[aSink];
@@ -2228,6 +2289,7 @@ async function finish(){
     const text=requestText({files, ...info, marks:s.marks});
     S=null; ui(false);
     await showDone(files, text);
+    if(s.sinks[0].blob){ LAST.blob=s.sinks[0].blob(); dlBtn(); }
     if(s.sheet) await sendSheet(s.sinks[0].blob(), files[0], info, text, s.sid);
     else await DB.remove(s.sid);
   }catch(e){ S=null; ui(false); show('alert','保存に失敗しました。ページを開き直すと「復元して保存」できます：'+e.message); }
