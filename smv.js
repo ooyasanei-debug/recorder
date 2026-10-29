@@ -292,10 +292,34 @@ var SMILE_FILLER = function (cfg) {
     if (TOP.__smvWait) { TOP.__smvWait.again(); return; }
     var F = SF();
     var det = F.detect();
-    load(function (j) {
-      if (det.ok) show(j, F, det, TOP);
-      else wait(j);
+    latestCfg(function () {
+      load(function (j) {
+        if (det.ok) show(j, F, det, TOP);
+        else wait(j);
+      });
     });
+
+    // ---- 最新の連携先を公開中の index.html から読む（ブックマーク登録後に連携URLが変わっても動くように） ----
+    function latestCfg(next) {
+      var done = false, fin = function () { if (!done) { done = true; next(); } };
+      try {
+        var base = (C.base || 'https://ooyasanei-debug.github.io/recorder/');
+        var x = new XMLHttpRequest();
+        x.open('GET', base + 'index.html?t=' + Date.now());
+        x.timeout = 6000;
+        x.onload = function () {
+          try {
+            var m = x.responseText.match(/\/\*@@CFG\*\/const BUILTIN_CFG=(\{[\s\S]*?\});\/\*CFG@@\*\//);
+            var o = m && JSON.parse(m[1]);
+            if (o && o.url && o.key) { C.u = o.url; C.k = o.key; }
+          } catch (e) { }
+          fin();
+        };
+        x.onerror = x.ontimeout = fin;
+        x.send();
+      } catch (e) { fin(); }
+      setTimeout(fin, 7000);
+    }
 
     // ---- 送信データの取得（JSONP） ----
     function load(done) {
@@ -307,7 +331,8 @@ var SMILE_FILLER = function (cfg) {
         if (!j || !j.ok) { alert('SMILE V 転記：' + ((j && j.error) || 'データを取得できませんでした')); return; }
         done(j);
       };
-      s.onerror = function () { alert('SMILE V 転記：会議録音ツールのスプシに接続できません。ネットワークを確認してください。'); };
+      s.onerror = function () { alert('SMILE V 転記：会議録音ツールのスプシに接続できません。\n・社内ネットワークで Google（script.google.com）への接続が止められていないか\n・Apps Script のデプロイが「新バージョン」になっているか\nを確認してください。'); };
+      if (!C.u || !C.k || !C.n) { alert('SMILE V 転記：設定が読み込めませんでした。会議録音ツールの［SMILE V 議事録］→［その他 ▾］→［ブックマークを登録し直す］で登録し直してください。'); return; }
       s.src = C.u + '?a=smv&k=' + encodeURIComponent(C.k) + '&n=' + encodeURIComponent(C.n) + '&cb=' + cb + '&t=' + Date.now();
       (TOP.document.head || TOP.document.documentElement).appendChild(s);
     }
