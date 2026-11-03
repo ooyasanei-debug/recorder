@@ -119,7 +119,7 @@
 <body>
 <main>
   <header>
-    <h1>会議録音・議事録作成ツール <span class="ver" id="appVer">ver.16</span></h1>
+    <h1>会議録音・議事録作成ツール <span class="ver" id="appVer">ver.17</span></h1>
     <div class="tabs">
       <button class="tab on" data-tab="rec">録音する</button>
       <button class="tab" data-tab="smv">SMILE V 議事録</button>
@@ -207,6 +207,7 @@
         <span id="state"></span>
         <div class="meter"><i id="lvl"></i></div>
         <button class="sub" id="btnPause">一時停止</button>
+        <button class="sub hide" id="btnReshare">相手の声を取り込み直す</button>
         <button class="stop" id="btnStop">■ 停止</button>
       </div>
       <div class="warnline" id="silence">20秒以上、音声がほとんど入っていません。マイクのミュートや接続を確認してください。</div>
@@ -1778,7 +1779,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
 "use strict";
 const $ = id => document.getElementById(id);
 const AUDIO_BPS = 48000, VIDEO_BPS = 1500000, SLICE_MS = 5000, CONV_BPS = 32000;
-/*@@CFG*/const BUILTIN_CFG={"url":"https://script.google.com/macros/s/AKfycbx-hyLW4-37vqbpCgHjGfM64OzIZr6Od7kAdR6bBe-aoNqb8Oj0faMJ0tGyiCw2Q5mQ/exec","key":"sanei26rec","names":["大屋","高木","村上","長尾","蓑田","藤田","川村","湯淺"]};/*CFG@@*/
+/*@@CFG*/const BUILTIN_CFG={"url":"","key":""};/*CFG@@*/
 const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
                 set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
 const pad = n => String(n).padStart(2,'0');
@@ -1902,7 +1903,7 @@ $('btnNext').onclick=()=>{
   window.scrollTo({top:0,behavior:'smooth'});
 };
 /* ---------- 音声のダウンロード（録音直後は端末内のデータ、以前の分はGoogleドライブ） ---------- */
-const APP_VER='ver.16';
+const APP_VER='ver.17';
 const driveDl=id=>'https://drive.google.com/uc?export=download&id='+encodeURIComponent(id);
 let LAST=null;
 function dlBtn(){ $('btnDl').classList.toggle('hide',!(LAST&&(LAST.blob||LAST.id))); }
@@ -2273,7 +2274,7 @@ async function begin(mode){
         else if(!confirm('「システム音声も共有する」がオフのため、相手の声が録音されません。\n\n［OK］自分のマイクだけで録音する\n［キャンセル］やり直す（もう一度［オンライン会議］を押し、オンにして共有）')){
           throw Object.assign(new Error('共有をやり直してください：［オンライン会議］→［画面全体］→「システム音声も共有する」をオン →［共有］'),{share:true});
         }
-        display.getVideoTracks()[0].addEventListener('ended',()=>finish());
+        display.getVideoTracks()[0].addEventListener('ended',onShareEnded);
       }
     }
     const t0=new Date();
@@ -2291,7 +2292,7 @@ async function begin(mode){
       vr.ondataavailable=e=>{ if(e.data.size) vSink.push(e.data); }; vr.start(SLICE_MS); recs.push(vr);
     }
     let wake=null; try{ wake=await navigator.wakeLock?.request('screen'); }catch(e){}
-    S={sheet:saveMode()==='sheet',ext,face,kind,dir,ctx,an,recs,sinks,stops,wake,base,sid,t0,before:0,since:Date.now(),paused:false,marks:[],loudAt:Date.now()};
+    S={sheet:saveMode()==='sheet',ext,face,kind,dir,ctx,mix,an,shareLost:false,recs,sinks,stops,wake,base,sid,t0,before:0,since:Date.now(),paused:false,marks:[],loudAt:Date.now()};
     $('markList').innerHTML=''; pushHist(); ui(true); tick(); meter();
     document.addEventListener('visibilitychange',rewake);
   }catch(e){
@@ -2336,9 +2337,30 @@ function ui(on){
   $('live').classList.toggle('hide',!on); $('startCard').classList.toggle('hide',on);
   $('live').classList.remove('paused'); $('btnPause').textContent='一時停止';
   if(on){ $('doneCard').classList.add('hide'); stateText(); $('live').scrollIntoView({block:'start'}); }
-  else{ $('timer').textContent='00:00:00'; $('lvl').style.width='0'; $('silence').classList.remove('show'); }
+  else{ $('btnReshare').classList.add('hide'); $('timer').textContent='00:00:00'; $('lvl').style.width='0'; $('silence').classList.remove('show'); }
 }
-function tick(){ if(!S) return; $('timer').textContent=fmt(elapsed(S)); stateText(); $('silence').classList.toggle('show',!S.paused&&Date.now()-S.loudAt>20000); setTimeout(tick,500); }
+// 画面共有が終わっても録音は止めない（Meet の時間切れ・共有の停止など）。マイクの録音は続け、共有をやり直せるようにする
+function onShareEnded(){
+  if(!S||S.stopping) return;
+  S.shareLost=true; S.loudAt=Date.now();
+  S.marks.push({t:fmt(elapsed(S)),type:'メモ',note:'画面共有が終了（相手の声が途切れた可能性）'});
+  $('btnReshare').classList.remove('hide');
+  show('alert','画面共有が終わりました（会議の終了・時間切れ・共有の停止など）。録音は止まっていません（自分のマイクは録音中です）。\n会議を続ける場合：［相手の声を取り込み直す］→「画面全体」＋「システム音声も共有する」をオンにして共有\n会議が終わった場合：［■ 停止］\n※この状態で10分間音がなければ自動で停止・保存します。');
+}
+$('btnReshare').onclick=async()=>{
+  if(!S) return;
+  try{
+    const d=await shareScreen();
+    S.stops.push(...d.getTracks());
+    if(d.getAudioTracks().length){ const src=S.ctx.createMediaStreamSource(new MediaStream(d.getAudioTracks())); src.connect(S.mix); src.connect(S.an); }
+    else{ d.getTracks().forEach(t=>t.stop()); show('alert','「システム音声も共有する」がオフでした。もう一度［相手の声を取り込み直す］を押して、オンにして共有してください。'); return; }
+    d.getVideoTracks()[0].addEventListener('ended',onShareEnded);
+    S.shareLost=false; S.marks.push({t:fmt(elapsed(S)),type:'メモ',note:'画面共有を再開'});
+    $('btnReshare').classList.add('hide'); show('alert','');
+  }catch(e){ if(e.name!=='NotAllowedError') show('alert','共有をやり直せませんでした：'+e.message); }
+};
+function tick(){ if(!S) return; $('timer').textContent=fmt(elapsed(S)); stateText();
+  if(S.shareLost && !S.paused && Date.now()-S.loudAt>10*60*1000){ finish(); return; } $('silence').classList.toggle('show',!S.paused&&Date.now()-S.loudAt>20000); setTimeout(tick,500); }
 function meter(){ if(!S) return; const v=level(S.an); $('lvl').style.width=v+'%'; if(v>6) S.loudAt=Date.now(); requestAnimationFrame(meter); }
 $('btnOnline').onclick=()=>begin('online');
 $('btnFace').onclick=()=>begin('face');
