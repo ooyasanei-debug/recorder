@@ -119,7 +119,7 @@
 <body>
 <main>
   <header>
-    <h1>会議録音・議事録作成ツール <span class="ver" id="appVer">ver.17</span></h1>
+    <h1>会議録音・議事録作成ツール <span class="ver" id="appVer">ver.18</span></h1>
     <div class="tabs">
       <button class="tab on" data-tab="rec">録音する</button>
       <button class="tab" data-tab="smv">SMILE V 議事録</button>
@@ -145,7 +145,7 @@
       <summary class="small">管理者用</summary>
       <div class="grid" style="margin-top:8px">
         <span class="k">連携URL</span><input type="text" id="cfgUrl" placeholder="https://script.google.com/macros/s/…/exec">
-        <span class="k">合言葉</span><input type="text" id="cfgKey">
+        <input type="hidden" id="cfgKey">
       </div>
       <div class="btnrow">
         <button class="sub" id="cfgSave">接続テスト</button>
@@ -273,7 +273,7 @@
     <details id="histBox">
       <summary><b>これまでの自分の録音</b> <span class="small">音声のダウンロード・依頼文のコピー</span></summary>
       <div class="btnrow"><button class="sub" id="histReload">再読み込み</button><span class="small" id="histMsg"></span></div>
-      <div class="small" style="margin-top:6px">音声はGoogleドライブから保存します（登録したGoogleアカウントでログインが必要）。音声は登録から30日で自動削除されます。必要なものは早めに保存してください。</div>
+      <div class="small" style="margin-top:6px">音声はGoogleドライブから保存します（登録したGoogleアカウントでログインが必要）。音声は登録から7日で自動削除されます。必要なものは早めに保存してください。</div>
       <div id="histList"></div>
     </details>
   </section>
@@ -1779,7 +1779,7 @@ if (typeof module === "object" && typeof module.exports === "object") Object.ass
 "use strict";
 const $ = id => document.getElementById(id);
 const AUDIO_BPS = 48000, VIDEO_BPS = 1500000, SLICE_MS = 5000, CONV_BPS = 32000;
-/*@@CFG*/const BUILTIN_CFG={"url":"https://script.google.com/macros/s/AKfycbx-hyLW4-37vqbpCgHjGfM64OzIZr6Od7kAdR6bBe-aoNqb8Oj0faMJ0tGyiCw2Q5mQ/exec","key":"sanei26rec","names":["大屋","高木","村上","長尾","蓑田","藤田","川村","湯淺"]};/*CFG@@*/
+/*@@CFG*/const BUILTIN_CFG={"url":"","key":""};/*CFG@@*/
 const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
                 set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
 const pad = n => String(n).padStart(2,'0');
@@ -1903,7 +1903,7 @@ $('btnNext').onclick=()=>{
   window.scrollTo({top:0,behavior:'smooth'});
 };
 /* ---------- 音声のダウンロード（録音直後は端末内のデータ、以前の分はGoogleドライブ） ---------- */
-const APP_VER='ver.17';
+const APP_VER='ver.18';
 const driveDl=id=>'https://drive.google.com/uc?export=download&id='+encodeURIComponent(id);
 let LAST=null;
 function dlBtn(){ $('btnDl').classList.toggle('hide',!(LAST&&(LAST.blob||LAST.id))); }
@@ -1944,7 +1944,7 @@ async function loadMine(){
     $('histMsg').textContent=HIST_ITEMS.length?`${user} さんの録音 ${HIST_ITEMS.length} 件（新しい順）`:`${user} さんの録音はまだありません`;
     $('histList').innerHTML=HIST_ITEMS.map((it,i)=>`<div class="hitem">
       <div><b>${escH(it.name||it.project||'（会議名なし）')}</b> <span class="small">${escH(it.when||it.at)}${it.dur?'　'+escH(it.dur):''}${it.kind?'　'+escH(it.kind):''}</span></div>
-      <div class="btnrow">${it.id?`<a class="sub" href="${driveDl(it.id)}" target="_blank" rel="noopener">音声をダウンロード</a>`:'<span class="small">音声は保存期間（30日）を過ぎたため削除済み</span>'}
+      <div class="btnrow">${it.id?`<a class="sub" href="${driveDl(it.id)}" target="_blank" rel="noopener">音声をダウンロード</a>`:(/端末/.test(it.file||'')?'<span class="small">音声は各自の端末に保存（スプシには未登録）</span>':'<span class="small">音声は保存期間（7日）を過ぎたため削除済み</span>')}
         <button class="sub" data-cp="${i}">依頼文をコピー</button><button class="link" data-sh="${i}">依頼文を表示</button><span class="small" data-msg="${i}"></span></div>
       <textarea class="hide" readonly data-tx="${i}"></textarea></div>`).join('');
   }catch(e){
@@ -1964,16 +1964,16 @@ $('histList').onclick=async e=>{
 const radiosA=[...document.querySelectorAll('input[name=save]')], radiosB=[...document.querySelectorAll('input[name=save2]')];
 function syncSave(v){ [...radiosA,...radiosB].forEach(r=>r.checked=r.value===v); store.set('saveMode',v); }
 [...radiosA,...radiosB].forEach(r=>r.onchange=()=>syncSave(r.value));
-syncSave(store.get('saveMode',(BUILTIN_CFG.url&&BUILTIN_CFG.key)?'sheet':'download'));
+syncSave(store.get('saveMode',BUILTIN_CFG.url?'sheet':'download'));
 setTimeout(()=>refreshCfgUI(),0);
 const saveMode=()=>radiosA.find(r=>r.checked).value;
 
 /* ---------- スプシ連携 ---------- */
 // ファイルに埋め込んだ設定を最優先（端末に残った古い連携URLは使わない）
-const HAS_BUILTIN=!!(BUILTIN_CFG.url&&BUILTIN_CFG.key);
-if(HAS_BUILTIN){ try{ const o=store.get('sheetCfg',null); if(o&&(o.url||o.key)){ localStorage.removeItem('sheetCfg'); localStorage.removeItem('members'); } }catch(e){} }
-const cfg=()=>{ const c=HAS_BUILTIN?{}:store.get('sheetCfg',{}); return {url:HAS_BUILTIN?BUILTIN_CFG.url:(c.url||''), key:HAS_BUILTIN?BUILTIN_CFG.key:(c.key||''), user:store.get('userName','')||c.user||''}; };
-const sheetReady=()=>{ const c=cfg(); return !!(c.url&&c.key); };
+const HAS_BUILTIN=!!BUILTIN_CFG.url;
+if(HAS_BUILTIN){ try{ const o=store.get('sheetCfg',null); if(o&&o.url){ localStorage.removeItem('sheetCfg'); localStorage.removeItem('members'); } }catch(e){} }
+const cfg=()=>{ const c=HAS_BUILTIN?{}:store.get('sheetCfg',{}); return {url:HAS_BUILTIN?BUILTIN_CFG.url:(c.url||''), key:HAS_BUILTIN?(BUILTIN_CFG.key||''):(c.key||''), user:store.get('userName','')||c.user||''}; };
+const sheetReady=()=>!!cfg().url;
 function refreshCfgUI(){
   const ok=sheetReady();
   document.body.classList.toggle('noSheet',!ok);
@@ -2014,9 +2014,9 @@ $('btnCfg').onclick=async()=>{ const c=store.get('sheetCfg',{}); $('cfgUrl').val
 $('cfgClose').onclick=()=>$('cfgCard').classList.add('hide');
 $('cfgUser').onchange=()=>{ const v=$('cfgUser').value; if(!v) return; store.set('userName',v); refreshCfgUI(); if($('smvFrame').srcdoc){ const x=$('smvFrame').srcdoc; $('smvFrame').srcdoc=''; $('smvFrame').srcdoc=x; } $('cfgMsg').textContent='名前を「'+v+'」にしました。SMILE V 転記のブックマークは登録し直してください。'; };
 $('cfgSave').onclick=async()=>{
-  const c={url:$('cfgUrl').value.trim(),key:$('cfgKey').value.trim()};
+  const c={url:$('cfgUrl').value.trim()};
   if(!HAS_BUILTIN) store.set('sheetCfg',c); MEMBERS=null; refreshCfgUI();
-  if(!c.url||!c.key){ $('cfgMsg').textContent='連携URLと合言葉を入力してください。'; return; }
+  if(!c.url){ $('cfgMsg').textContent='連携URLを入力してください。'; return; }
   $('cfgMsg').textContent='接続テスト中…';
   try{ const j=await gas({action:'ping'},c); syncSave('sheet'); refreshCfgUI();
     $('cfgMsg').textContent=`接続OK：スプシ「${j.sheet}」／保存先フォルダ「${j.folder}」／メンバー ${j.members}人／ツール ${APP_VER}・スプシ側 ${j.ver||'ver.10以前（要更新）'}`;
@@ -2024,15 +2024,15 @@ $('cfgSave').onclick=async()=>{
   catch(e){ $('cfgMsg').textContent='接続できません：'+e.message; }
 };
 $('cfgBake').onclick=async()=>{
-  const c={url:$('cfgUrl').value.trim(),key:$('cfgKey').value.trim()};
-  if(!c.url||!c.key){ $('cfgMsg').textContent='連携URLと合言葉を入力してください。'; return; }
+  const c={url:$('cfgUrl').value.trim()};
+  if(!c.url){ $('cfgMsg').textContent='連携URLを入力してください。'; return; }
   try{
     MEMBERS=null; c.names=(await gas({action:'members'},c)).names||[];   // メンバーの名前もファイルに入れておく（初回の表示を速く）
     const src=await (await fetch(location.href.split('#')[0],{cache:'no-store'})).text();
     if(!/\/\*@@CFG\*\/[\s\S]*?\/\*CFG@@\*\//.test(src)) throw new Error('ページの読み込みに失敗しました');
     const out=src.replace(/\/\*@@CFG\*\/[\s\S]*?\/\*CFG@@\*\//,'/*@@CFG*/const BUILTIN_CFG='+JSON.stringify(c)+';/*CFG@@*/');
     download(new Blob([out],{type:'text/html'}),'index.html');
-    $('cfgMsg').textContent='index.html を作りました。GitHub の index.html に上書きアップロードしてください（合言葉がファイルに入るので社外に渡さないでください）。';
+    $('cfgMsg').textContent='index.html を作りました。GitHub の index.html に上書きアップロードしてください（連携URLがファイルに入るので社外に渡さないでください）。';
   }catch(e){ $('cfgMsg').textContent='作れませんでした：'+e.message+'（GitHubで公開中のページから操作してください）'; }
 };
 window.SMV={ url:'http://smile-server/vwebapp/001/WFL/OSK.X1.WFL.X10010/90/' };   // SMILE V 打合議事録
@@ -2098,6 +2098,19 @@ async function sendSheet(blob,name,info,text,sid){
   }finally{ UPLOADING=false; try{ wake&&wake.release(); }catch(e){} }
 }
 let UPLOADING=false;
+// 音声を端末（ダウンロード・フォルダ）に保存した場合も、依頼文はスプシに記録しておく（「これまでの自分の録音」から再利用できる）
+async function notePrompt(name,info,text){
+  if(!sheetReady()) return;
+  $('upBox').classList.remove('hide'); $('upFail').innerHTML=''; $('upProg').style.width='0';
+  $('upMsg').textContent='依頼文をスプシに記録中…';
+  try{
+    const j=await gas({action:'note',name,meta:{...metaNow(info),user:cfg().user||''},prompt:text});
+    if(CTX) CTX.row=j.row; saveLast(text); HIST_LOADED=false;
+    $('upMsg').textContent=`依頼文をスプシに記録しました（録音一覧 ${j.row}行目）。音声はこの端末に保存しています。`; $('upProg').style.width='100%';
+  }catch(e){
+    $('upMsg').textContent=/不明な操作/.test(e.message)?'音声は端末に保存しました（スプシ側が古い版のため、依頼文は記録していません）':'音声は端末に保存しました（依頼文をスプシに記録できませんでした：'+e.message+'）';
+  }
+}
 async function chooseDir(){
   if(saveMode()!=='folder' || !window.showDirectoryPicker) return null;
   return await window.showDirectoryPicker({id:'recorder',mode:'readwrite',startIn:'documents'});
@@ -2316,7 +2329,7 @@ async function finish(){
     await showDone(files, text, {info, marks:s.marks});
     if(s.sinks[0].blob){ LAST.blob=s.sinks[0].blob(); dlBtn(); }
     if(s.sheet) await sendSheet(s.sinks[0].blob(), files[0], info, text, s.sid);
-    else await DB.remove(s.sid);
+    else{ await DB.remove(s.sid); await notePrompt(files[0], info, text); }
   }catch(e){ S=null; ui(false); show('alert','保存に失敗しました。ページを開き直すと「復元して保存」できます：'+e.message); }
 }
 const elapsed=s=>s.before+(s.paused?0:Date.now()-s.since);
@@ -2398,6 +2411,7 @@ async function convertAll(files){
       const text=requestText({files:[names[i]], ...info});
       await showDone([names[i]], text, {info});
       if(saveMode()==='sheet') await sendSheet(blobs[i], names[i], info, text, null);
+      else await notePrompt(names[i], info, text);
     }
   }
   CONVERTING=false;
