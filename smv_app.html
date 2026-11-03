@@ -1,0 +1,1690 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SMILE V 議事録アシスタント</title>
+<style>
+:root{
+  --bg:#eef1f5; --panel:#fff; --line:#cfd7e2; --text:#1d2633; --muted:#667386;
+  --pri:#1f5fa8; --pri-d:#174a85; --accent:#e07b00; --err:#c62828; --warn:#a15c00; --ok:#2e7d32;
+  --grid-head:#bdbdbd; --title-row:#eef4fb;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:13px/1.5 "Meiryo UI","Yu Gothic UI","Hiragino Sans",sans-serif;display:flex;flex-direction:column}
+button{font:inherit;padding:5px 10px;border:1px solid var(--line);background:#fff;border-radius:4px;cursor:pointer;color:var(--text)}
+button:hover{border-color:var(--pri);color:var(--pri)}
+button.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+button.pri:hover{background:var(--pri-d);color:#fff}
+button.pri2{border-color:var(--pri);color:var(--pri);font-weight:bold}
+button.danger{color:var(--err)}
+button.small{padding:3px 8px;font-size:12px}
+button:disabled{opacity:.5;cursor:default}
+input,select,textarea{font:inherit;border:1px solid var(--line);border-radius:4px;padding:4px 6px;background:#fff;color:var(--text)}
+input:focus,textarea:focus,select:focus{outline:2px solid #9cc0ea;border-color:var(--pri)}
+.hidden{display:none!important}
+kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:3px;padding:0 4px;background:#fafafa;font-size:12px}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 14px;background:#1d2633;color:#fff;flex-wrap:wrap}
+.brand{font-weight:bold;font-size:15px;white-space:nowrap}
+.mode{font-weight:normal;font-size:11px;background:#3a475a;padding:1px 6px;border-radius:8px;margin-left:6px}
+.tools{display:flex;gap:6px;align-items:center;flex-wrap:wrap;position:relative}
+.tools select{padding:4px}
+.sep{width:1px;height:22px;background:#4b5868;margin:0 2px}
+.menu{position:absolute;right:0;top:34px;background:#fff;border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,.18);z-index:20;display:flex;flex-direction:column;min-width:230px;padding:4px}
+.menu button{border:0;text-align:left;padding:7px 10px}
+.menu button:hover{background:#f0f4f9}
+
+/* layout */
+.layout{flex:1;display:grid;grid-template-columns:220px minmax(400px,1fr) minmax(520px,1.15fr);gap:10px;padding:10px;min-height:0}
+.side,.editor,.preview{background:var(--panel);border:1px solid var(--line);border-radius:8px;min-height:0}
+.side{display:flex;flex-direction:column;padding:8px;gap:6px}
+.side input{width:100%}
+#list{list-style:none;margin:0;padding:0;overflow:auto;flex:1}
+#list li{padding:6px 8px;border-radius:5px;cursor:pointer;border-left:3px solid transparent;margin-bottom:2px}
+#list li:hover{background:#f3f6fa}
+#list li.sel{background:#e3edf8;border-left-color:var(--pri)}
+#list .t1{font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#list .t2{font-size:11px;color:var(--muted);display:flex;justify-content:space-between}
+.badge{font-size:10px;padding:0 5px;border-radius:7px;background:#e7f3e8;color:var(--ok)}
+.badge.type{background:#eef1f5;color:var(--muted)}
+
+.editor{overflow:auto;padding:10px 12px}
+.card{border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:10px;background:#fbfcfe}
+.title-line{display:flex;align-items:center;gap:6px;margin-bottom:8px;font-weight:bold}
+.title-line .grow{flex:1;font-weight:normal}
+.w4{width:48px;text-align:center}
+.w8{width:90px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
+.grid2 label{display:flex;flex-direction:column;font-size:11px;color:var(--muted)}
+.grid2 label.full{grid-column:1/-1}
+.grid2 input,.grid2 select{font-size:13px;color:var(--text)}
+.chk{display:block;margin-top:8px}
+#alerts .al{padding:6px 10px;border-radius:5px;margin-bottom:6px;font-size:12px}
+#alerts .e{background:#fdecea;color:var(--err);border:1px solid #f5c2bd}
+#alerts .w{background:#fff6e5;color:var(--warn);border:1px solid #f3dcae}
+
+.secbar{display:flex;align-items:center;gap:8px;margin:4px 0 6px;flex-wrap:wrap}
+.secbar h2{font-size:14px;margin:0}
+.hint{color:var(--muted);font-size:11px;flex:1}
+.sec{border:1px solid var(--line);border-radius:6px;margin-bottom:8px;background:#fff}
+.sec.hiyari{border-color:#f0b37a;background:#fffaf4}
+.sec.active{box-shadow:0 0 0 2px #9cc0ea}
+.sec-h{display:flex;gap:6px;align-items:center;padding:6px 8px;border-bottom:1px solid #eef1f5}
+.num{background:var(--pri);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;flex:none}
+.sec-h .ttl{flex:1;font-weight:bold}
+.sec-h .vf{width:120px;font-size:12px}
+.sec-h button{padding:2px 7px}
+.sec textarea{width:100%;border:0;border-radius:0 0 6px 6px;padding:8px;resize:vertical;min-height:54px;line-height:1.6}
+.sec .meta{font-size:11px;color:var(--muted);padding:0 8px 4px;text-align:right}
+.memo{display:block;margin-top:8px;font-size:11px;color:var(--muted)}
+.memo textarea{width:100%}
+
+/* preview */
+.preview{display:flex;flex-direction:column;overflow:hidden}
+.pvhead{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line)}
+.pvhead h2{font-size:14px;margin:0}
+#pvStat{font-size:12px;color:var(--muted)}
+.pvwrap{overflow:auto;flex:1}
+.pv{border-collapse:collapse;width:100%;font-family:"MS Gothic","Meiryo UI",monospace}
+.pv th{background:var(--grid-head);font-weight:normal;padding:4px;position:sticky;top:0;border:1px solid #9e9e9e}
+.pv td{border:1px solid #d5d5d5;padding:3px 5px;white-space:pre;font-size:12px}
+.pv .c1,.pv td:first-child{width:32px;text-align:center;color:var(--muted)}
+.pv .c2,.pv td:nth-child(2){width:46px;text-align:center}
+.pv .c4,.pv td:nth-child(4){width:34px;text-align:right;color:var(--muted);font-family:inherit;font-size:11px}
+.pv tr.title td{background:var(--title-row);font-weight:bold}
+.pv tr.over td{background:#fdecea}
+.pv tr.over td:nth-child(4){color:var(--err);font-weight:bold}
+.pv tr.end td{color:var(--muted)}
+.pv tr:hover td{outline:1px solid #9cc0ea}
+
+/* dialogs */
+dialog{border:0;border-radius:10px;padding:16px 18px;width:min(640px,94vw);box-shadow:0 12px 40px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(20,30,45,.45)}
+dialog h3{margin:0 0 8px;color:var(--pri)}
+.desc{color:var(--muted);margin:4px 0 8px}
+.drop{border:2px dashed #9cb3cf;border-radius:8px;padding:22px;text-align:center;color:var(--pri);cursor:pointer;margin-bottom:8px;background:#f6f9fd}
+.drop.over{background:#e3edf8}
+dialog textarea{width:100%}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin:8px 0}
+.btns{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.steps{padding-left:20px}
+.steps li{margin-bottom:10px}
+.steps.small li{margin-bottom:4px}
+.ok{color:var(--ok)}
+.status{margin-top:8px;padding:8px;border-radius:6px;background:#f3f6fa;white-space:pre-wrap;min-height:20px}
+.status.e{background:#fdecea;color:var(--err)}
+.status.s{background:#e7f3e8;color:var(--ok)}
+.form label{display:block;margin-bottom:8px}
+.form input[type=number]{width:80px}
+.form small{color:var(--muted);display:block}
+.help li{margin-bottom:6px}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1d2633;color:#fff;padding:8px 16px;border-radius:6px;opacity:0;transition:.25s;pointer-events:none;z-index:99}
+#toast.show{opacity:1}
+@media (max-width:1100px){.layout{grid-template-columns:200px 1fr}.preview{grid-column:1/-1;min-height:360px}}
+.pv tr.beyond td{background:#f6f6f6;color:#b0b0b0;text-decoration:line-through}
+.pv tr.cutline td{background:#c62828;color:#fff;font-family:"Meiryo UI",sans-serif;font-size:11px;text-align:center;padding:2px;white-space:normal}
+.pvhead button{margin-left:8px}
+
+a.bm{display:inline-block;background:var(--pri);color:#fff;text-decoration:none;font-weight:bold;padding:6px 14px;border-radius:14px;cursor:grab;margin-right:8px}
+
+.top{padding:6px 10px;justify-content:flex-end}
+.layout{grid-template-columns:200px minmax(400px,1fr) minmax(480px,1.1fr)}
+
+</style>
+</head>
+<body>
+<header class="top">
+  <span id="mode" class="hidden"></span>
+  <div class="tools">
+    <button id="btnNew">＋ 新規</button>
+    <button id="btnNext" title="選択中の下書きを元に、回数+1・本文空で作成">前回から次回作成</button>
+    <span class="sep"></span>
+    <button id="btnImport" class="pri2">議事録を取込</button>
+    <button id="btnUndo" title="元に戻す (Ctrl+Z)">↶ 元に戻す</button>
+    <span class="sep"></span>
+    <button id="btnTransfer" class="pri">SMILE V へ転記 ▶</button>
+    <button id="btnMore">その他 ▾</button>
+    <div id="moreMenu" class="menu hidden">
+      <button data-act="ai">AI要約（Claude）</button>
+      <button data-act="simplify">簡潔化（である調）</button>
+      <button data-act="bm">ブックマークを登録し直す</button>
+      <button data-act="settings">設定</button>
+      <button data-act="help">使い方</button>
+    </div>
+  </div>
+</header>
+
+<main class="layout">
+  <!-- 下書き一覧 -->
+  <aside class="side">
+    <input id="search" type="search" placeholder="下書きを検索">
+    <ul id="list"></ul>
+    <button id="btnDelete" class="danger small">選択中を削除</button>
+  </aside>
+
+  <!-- 編集 -->
+  <section class="editor">
+    <div id="alerts"></div>
+    <div class="card head">
+      <div class="title-line">
+        <span>第</span><input id="f_kai" class="w4" inputmode="numeric"><span>回</span>
+        <input id="f_kenmei" class="grow" placeholder="件名（工事名）" list="dl_kenmei">
+        <span>打合書</span>
+      </div>
+      <div class="grid2">
+        <label>種別<select id="f_type"></select></label>
+        <label>打合日時<input id="f_date" placeholder="yyyy/mm/dd"></label>
+        <label>打合場所<input id="f_place" list="dl_place"></label>
+        <label>受注No（メモ）<input id="f_juchu"></label>
+        <label class="full">打合者（客先1）<input id="f_kyaku1" list="dl_kyaku"></label>
+        <label class="full">打合者（客先2）<input id="f_kyaku2" list="dl_kyaku"></label>
+        <label class="full">打合者（社内）<input id="f_shanai" list="dl_shanai"></label>
+      </div>
+      <label class="chk"><input type="checkbox" id="f_hiyari"> 現場へ行った（<b>ヒヤリハット報告 必須</b>）</label>
+    </div>
+
+    <div class="secbar">
+      <h2>打合事項</h2>
+      <span class="hint"><b id="limitLbl" class="hidden">50</b></span>
+      <select id="tplSel"><option value="">見出しを追加…</option></select>
+      <button id="btnAddSec" class="small">＋ セクション</button>
+    </div>
+    <div id="sections"></div>
+    <label class="memo">メモ（転記されません）<textarea id="f_memo" rows="2"></textarea></label>
+  </section>
+
+  <!-- プレビュー -->
+  <section class="preview">
+    <div class="pvhead">
+      <h2>SMILE V プレビュー</h2>
+      <span id="pvStat"></span>
+      <button id="btnFit" class="small" title="短い行をまとめる等して上限行数に収めます（↶で戻せます）">30行に自動調整</button>
+    </div>
+    <div class="pvwrap">
+      <table class="pv">
+        <thead><tr><th class="c1"></th><th class="c2">番号</th><th>打 合 事 項</th><th class="c4">字</th></tr></thead>
+        <tbody id="pvBody"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<!-- 取込ダイアログ -->
+<dialog id="dlgImport">
+  <h3>議事録を取込</h3>
+  <p class="desc">会議録音ツール＋Claude で作成した議事録（.docx）をドロップ、またはテキストを貼り付けてください。</p>
+  <div id="drop" class="drop">ここに .docx / .txt をドロップ<br><small>またはクリックして選択</small></div>
+  <input type="file" id="file" accept=".docx,.txt,.md" hidden>
+  <textarea id="impText" rows="6" placeholder="テキストを貼り付ける場合はこちら（AI要約結果の【件名】■見出し 形式もそのまま取込めます）"></textarea>
+  <div class="opts">
+    <label>種別 <select id="impType"></select></label>
+    <label>まとめ方
+      <select id="impLevel"><option value="summary">要約（重要事項まとめ中心）</option><option value="detail">詳細（議題ごとの内容）</option></select></label>
+    <label><input type="checkbox" id="impSimplify" checked> である調に簡潔化</label>
+    <label><input type="checkbox" id="impSpeaker" checked> 発言者表記（大屋）等を削除</label>
+    <label><input type="checkbox" id="impKakunin"> 【要確認】を削除</label>
+    <label><input type="checkbox" id="impFit" checked> 30行に収まるよう自動調整</label>
+    <label><input type="checkbox" id="impKeepHead" > 現在の下書きの見出し情報（第○回・件名）を残す</label>
+  </div>
+  <div class="btns"><button id="impCancel">キャンセル</button><button id="impGo" class="pri">新しい下書きとして取込</button></div>
+</dialog>
+
+<!-- AI要約ダイアログ -->
+<dialog id="dlgAI">
+  <h3>AI要約（Claude）</h3>
+  <ol class="steps">
+    <li><b>プロンプトをコピー</b> → Claude に貼り付けて送信<br>
+      <small>取込んだ議事録の全文が含まれます。取込前なら下の欄に元の議事録を貼り付けてください。</small>
+      <textarea id="aiSrc" rows="4" placeholder="元の議事録本文（docx取込済みなら自動で入ります）"></textarea>
+      <button id="aiCopy" class="pri">プロンプトをコピー</button> <span id="aiCopied" class="ok"></span></li>
+    <li><b>Claude の回答（コードブロックの中身）を貼り付け</b>
+      <textarea id="aiRes" rows="8" placeholder="【種別】…&#10;【件名】…&#10;■1 打合せ内容&#10;…"></textarea></li>
+  </ol>
+  <div class="btns"><button id="aiCancel">閉じる</button><button id="aiApply" class="pri">現在の下書きに反映</button></div>
+</dialog>
+
+<!-- 転記ダイアログ（初回のブックマーク登録・エラー時だけ表示） -->
+<dialog id="dlgTransfer">
+  <h3>SMILE V へ転記</h3>
+  <div id="trCheck"></div>
+  <div id="trBm" class="hidden">
+    <p><b>最初の1回だけ</b>：下の青いボタンを、ブックマークバーまでドラッグしてください。<br><small>バーが出ていない時は <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd></small></p>
+    <p><a id="bmLink" class="bm" href="#">SMILE V 転記</a> <button id="bmCopy" class="small">うまくいかない時：コードをコピー</button></p>
+    <p class="desc">次からは［SMILE V へ転記 ▶］で開いた SMILE V の画面で、このブックマークを押すだけです。</p>
+  </div>
+  <div id="trAfter" class="hidden">
+    <p><b>SMILE V の打合議事録を開きました。</b></p>
+    <p>開いた SMILE V の画面で、ブックマークバーの <b>［SMILE V 転記］</b> を押すと記入されます。<br><small>※このツールの画面は閉じずに開いたままにしてください（ここから SMILE V へ直接データを渡します）。</small></p>
+    <p class="desc">ブラウザの仕組み上、別のシステム（SMILE V）の画面にはこのツールから直接書き込めないため、SMILE V 側でこのボタンを1回押す必要があります。<br>
+    ブックマークバーが出ていない時は <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>。ブックマークが見当たらない時は、下の青いボタンをブックマークバーにドラッグして登録してください。</p>
+  </div>
+  <div id="trNoSheet" class="hidden"></div>
+  <div id="trStatus" class="status hidden"></div>
+  <div class="btns">
+    <button id="trCopyScript" class="hidden">転記スクリプトをコピー（F12用）</button>
+    <button id="trCancel">閉じる</button>
+    <button id="trGo" class="pri hidden">登録した → 転記する</button>
+  </div>
+</dialog>
+
+<!-- 設定 -->
+<dialog id="dlgSettings">
+  <h3>設定</h3>
+  <div class="form">
+    <label>打合事項 1行の文字数上限 <input type="number" id="s_limit" min="10" max="200"> <small>SMILE V 画面から自動検出した値で上書きされます</small></label>
+    <label>打合事項の行数上限（SMILE V の入力限界） <input type="number" id="s_maxRows" min="5" max="999"> <small>既定 30 行。超えると転記できません</small></label>
+    <label><input type="checkbox" id="s_contIndent"> 「・」等の箇条書きの折返し行を字下げ</label>
+    <label><input type="checkbox" id="s_bodyIndent"> 本文を1字下げ</label>
+    <label><input type="checkbox" id="s_blankRow"> セクション間に空行を入れる</label>
+    <label><input type="checkbox" id="s_keepEmpty"> 本文が空の見出しも転記する</label>
+    <label><input type="checkbox" id="s_addEnd"> 末尾に締めの行を入れる <input id="s_endText" class="w8"></label>
+  </div>
+  <div class="btns"><button id="sCancel">キャンセル</button><button id="sSave" class="pri">保存</button></div>
+</dialog>
+
+<!-- 使い方 -->
+<dialog id="dlgHelp">
+  <h3>使い方</h3>
+  <div class="help">
+    <ol>
+      <li><b>議事録を取込</b>：会議録音ツール＋Claude で作った議事録 .docx をドロップ。会議名・日時・場所・出席者・議題・重要事項・決定/保留・宿題・次回予定を自動で振り分けます。</li>
+      <li><b>整える</b>：見出し（番号付き行）と本文を編集。右のプレビューが SMILE V の行イメージです。50字超は自動で折返し（句読点優先・禁則処理つき）。赤い行は上限超過。</li>
+      <li><b>さらに要約したい時</b>：「AI要約（Claude）」でプロンプトをコピー → Claude の回答を貼り付けて反映。または「簡潔化」でです・ます調を一括変換。</li>
+      <li><b>現場調査</b>：種別「現場調査」を選ぶか「現場へ行った」にチェックすると、ヒヤリハット報告のセクションが追加され、ヒヤリハット報告が必須になります（空欄だと転記できません）。</li>
+      <li><b>SMILE V へ転記</b>：「SMILE V へ転記 ▶」で開いた SMILE V の画面で、ブックマーク［SMILE V 転記］を押すと転記されます（SMILE V のメニューから別窓で開く場合は、開く前に押しておけば自動で転記されます）。</li>
+      <li>転記後、SMILE V 側で内容を確認し、<b>受注No は「参照」で選択</b>、添付ファイルを付けてから「下書き保存」／「申請」してください（申請は自動では押しません）。</li>
+    </ol>
+    <p><b>便利機能</b>：前回から次回作成（回数+1）／入力候補／自動保存／元に戻す（Ctrl+Z）／AI要約・簡潔化（「その他」）。</p>
+    <p><b>下書きの保存</b>：自分の名前に紐づけてスプシ側にも保存されるので、別のPCやスマホでも同じ下書きが出ます。最後に編集してから半年（180日）たった下書きは自動で削除されます。</p>
+    <p><b>うまく転記できない時</b>：SMILE V 画面右上に出る［構造診断をコピー］の結果を Claude に貼り付けて相談してください。</p>
+  </div>
+  <div class="btns"><button id="helpClose" class="pri">閉じる</button></div>
+</dialog>
+
+<datalist id="dl_kenmei"></datalist><datalist id="dl_place"></datalist><datalist id="dl_kyaku"></datalist><datalist id="dl_shanai"></datalist>
+<input type="file" id="jsonFile" accept=".json" hidden>
+<div id="toast"></div>
+
+<script>
+/* =========================================================
+ * SMILE V 議事録アシスタント - 共通ロジック
+ *   ・テンプレート / 折返し(50字) / 行データ生成
+ *   ・議事録docx取込 / AI要約結果の取込 / 簡潔化
+ * ========================================================= */
+(function (global) {
+  'use strict';
+
+  // ---------------- 設定既定値 ----------------
+  const DEFAULT_SETTINGS = {
+    limit: 50,          // 打合事項 1行の最大文字数（SMILE V側で自動検出も行う）
+    maxRows: 30,        // SMILE V 打合事項の入力上限（行）
+    contIndent: true,   // 「・」等で始まる行の折返し行を1字下げ
+    bodyIndent: false,  // 本文を1字下げ
+    addEnd: true,       // 末尾に「以上」行
+    endText: '以上',
+    blankRow: false,    // セクション間に空行を入れる
+    keepEmpty: false,   // 本文が空の見出しも転記する
+  };
+
+  // ---------------- 打合せ種別テンプレート ----------------
+  const TEMPLATES = {
+    '打合せ': { hiyari: false, sections: ['打合せ内容', '打合せ結果', '今後のスケジュール'] },
+    '現場調査': { hiyari: true, sections: ['現場調査内容', '現場調査結果', 'その他', 'ヒヤリハット報告'] },
+    '社内会議': { hiyari: false, sections: ['議題', '決定事項', '宿題事項', '次回予定'] },
+    'その他': { hiyari: false, sections: ['内容', '結果'] },
+  };
+  // 旧版の種別名 → 新しい種別
+  const TYPE_ALIAS = { 'Web会議・見積': '打合せ', '工事立会・施工': '現場調査' };
+  function normType(t) { t = (t || '').trim(); t = TYPE_ALIAS[t] || t; return TEMPLATES[t] ? t : (t ? 'その他' : '打合せ'); }
+  const HIYARI_TITLE = 'ヒヤリハット報告';
+
+  function uid() { return 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+  function today() {
+    const d = new Date();
+    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  function newDraft(type) {
+    type = type || '打合せ';
+    const t = TEMPLATES[type] || TEMPLATES['打合せ'];
+    return {
+      id: uid(), created: Date.now(), updated: Date.now(),
+      type, hiyari: t.hiyari,
+      kai: '', kenmei: '', date: today(), place: '', juchu: '',
+      kyaku1: '', kyaku2: '', shanai: '', memo: '',
+      sections: t.sections.map(s => ({ title: s, body: s === HIYARI_TITLE ? '特になし' : '', verify: '' })),
+      transferred: null,
+    };
+  }
+
+  // ---------------- 折返し ----------------
+  const NO_START = '、。，．,.)）」』】〕］}ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮヵヶー…‥々ゝゞヽヾ!?！？:;：；%％';
+  const NO_END = '(（「『【〔［{';
+  const BREAK_AFTER = '、。，．,）」』】〕・／/ ';
+  const BULLET_RE = /^([ 　]*)(・|－|-|‐|―|※|○|●|◆|◇|■|□|★|☆|→|\(\d+\)|（\d+）|\d+[.．)）]|[①-⑳])/;
+
+  function cutPos(s, lim) {
+    // lim 以内で自然な区切り位置を探す
+    const win = Math.min(14, Math.floor(lim / 3));
+    for (let p = lim; p >= lim - win; p--) {
+      const a = s[p - 1], b = s[p];
+      if (b === undefined) return p;
+      if (NO_START.includes(b)) continue;
+      if (NO_END.includes(a)) continue;
+      if (/[（(][0-9０-９]{1,2}[）)]$|[①-⑳]$/.test(s.slice(Math.max(0, p - 4), p))) continue; // 「（3）」の直後では切らない
+      if (BREAK_AFTER.includes(a) || NO_END.includes(b)) return p;
+    }
+    // 区切りが無い → 禁則と英数字の分断だけ避けて切る
+    let p = lim;
+    for (let k = 0; k < 4 && p > 1 && (NO_START.includes(s[p]) || NO_END.includes(s[p - 1])); k++) p--;
+    let q = p;
+    while (q > lim - 12 && q > 1 && /[A-Za-z0-9._\-]/.test(s[q - 1]) && /[A-Za-z0-9._\-]/.test(s[q] || '')) q--;
+    if (q > lim - 12 && q > 1) p = q;
+    return p;
+  }
+
+  function wrapLine(line, limit, contIndent) {
+    line = line.replace(/\s+$/, '');
+    if (line.length <= limit) return [line];
+    let indent = '';
+    if (contIndent) {
+      const m = line.match(BULLET_RE);
+      if (m) {
+        const w = m[1].length + (m[2].length > 1 ? 1 : m[2].length);
+        indent = '　'.repeat(Math.min(w, 3));
+      }
+    }
+    const out = [];
+    let rest = line;
+    let guard = 0;
+    while (rest.length > limit && guard++ < 500) {
+      const p = cutPos(rest, limit);
+      out.push(rest.slice(0, p).replace(/\s+$/, ''));
+      rest = indent + rest.slice(p).replace(/^[ 　]+/, '');
+      if (rest.length <= indent.length) { rest = ''; break; }
+    }
+    if (rest) out.push(rest);
+    return out;
+  }
+
+  /** 下書き → SMILE V 行データ [{no, text, verify, kind}] */
+  function buildRows(draft, settings) {
+    const st = Object.assign({}, DEFAULT_SETTINGS, settings || {});
+    const rows = [];
+    let n = 0;
+    (draft.sections || []).forEach((sec, i) => {
+      const title = (sec.title || '').trim();
+      const body = (sec.body || '').replace(/\r/g, '');
+      if (!body.trim() && !st.keepEmpty) return; // 本文が空の見出しは転記しない
+      if (st.blankRow && rows.length) rows.push({ no: '', text: '', verify: '', kind: 'blank' });
+      if (title) {
+        n++;
+        wrapLine(title, st.limit, false).forEach((t, k) =>
+          rows.push({ no: k === 0 ? String(n) : '', text: t, verify: k === 0 ? (sec.verify || '') : '', kind: 'title', sec: i }));
+      }
+      body.split('\n').forEach(raw => {
+        if (!raw.trim()) return;
+        const line = (st.bodyIndent ? '　' : '') + raw.replace(/\s+$/, '');
+        wrapLine(line, st.limit, st.contIndent).forEach(t =>
+          rows.push({ no: '', text: t, verify: '', kind: 'body', sec: i }));
+      });
+    });
+    if (st.addEnd && st.endText && !draft.noEnd) rows.push({ no: '', text: st.endText, verify: '', kind: 'end' });
+    return rows;
+  }
+
+  // ---------------- 検証 ----------------
+  function validate(draft, settings) {
+    const st = Object.assign({}, DEFAULT_SETTINGS, settings || {});
+    const errors = [], warns = [];
+    if (draft.hiyari) {
+      const h = (draft.sections || []).find(s => (s.title || '').replace(/\s/g, '').includes('ヒヤリハット'));
+      if (!h) errors.push('現場に行った打合せは「ヒヤリハット報告」の記入が必須です（セクションがありません）。');
+      else if (!(h.body || '').trim()) errors.push('「ヒヤリハット報告」が空欄です。無い場合は「特になし」と記入してください。');
+    }
+    const empty = (draft.sections || []).filter(s => s.title && !(s.body || '').trim()).map(s => s.title);
+    if (empty.length && !st.keepEmpty) warns.push(`本文が空の見出し「${empty.join('」「')}」は転記されません。`);
+    if (!draft.date) warns.push('打合日時が未入力です。');
+    if (!draft.kenmei) warns.push('件名（第○回の後ろ）が未入力です。');
+    if (!draft.place) warns.push('打合場所が未入力です。');
+    if (!draft.shanai) warns.push('打合者（社内）が未入力です。');
+    const rows = buildRows(draft, st);
+    if (rows.length > st.maxRows) errors.push(`打合事項が ${rows.length} 行あり、SMILE V の入力上限 ${st.maxRows} 行を ${rows.length - st.maxRows} 行超えています。「${st.maxRows}行に自動調整」または本文を削ってください。`);
+    if (/【要確認】/.test(JSON.stringify(draft.sections))) warns.push('本文に【要確認】が残っています。');
+    return { errors, warns, rows };
+  }
+
+  // ---------------- テキスト書式（AI取込・コピー用） ----------------
+  const HEAD_KEYS = [
+    ['kai', ['第', '回', '回数']], ['kenmei', ['件名', '工事名']], ['date', ['打合日時', '日時', '日付']],
+    ['place', ['打合場所', '場所']], ['juchu', ['受注No', '受注№', '受注番号']],
+    ['kyaku1', ['打合者（客先1）', '打合者(客先1)', '客先1']], ['kyaku2', ['打合者（客先2）', '打合者(客先2)', '客先2']],
+    ['shanai', ['打合者（社内）', '打合者(社内)', '社内']], ['type', ['種別']],
+  ];
+  function normKey(k) { return k.replace(/[\s　]/g, '').replace(/\(/g, '（').replace(/\)/g, '）').replace(/１/g, '1').replace(/２/g, '2'); }
+
+  function draftToText(d) {
+    const L = [];
+    L.push(`【種別】${d.type || ''}`);
+    L.push(`【第】${d.kai || ''}`);
+    L.push(`【件名】${d.kenmei || ''}`);
+    L.push(`【打合日時】${d.date || ''}`);
+    L.push(`【打合場所】${d.place || ''}`);
+    L.push(`【受注No】${d.juchu || ''}`);
+    L.push(`【打合者（客先1）】${d.kyaku1 || ''}`);
+    L.push(`【打合者（客先2）】${d.kyaku2 || ''}`);
+    L.push(`【打合者（社内）】${d.shanai || ''}`);
+    (d.sections || []).forEach((s, i) => {
+      L.push(`■${i + 1} ${s.title || ''}`);
+      if (s.body) L.push(s.body);
+    });
+    return L.join('\n');
+  }
+
+  function parseDraftText(text, base) {
+    const d = base ? JSON.parse(JSON.stringify(base)) : newDraft('打合せ');
+    const sections = [];
+    let cur = null;
+    const keyMap = {};
+    HEAD_KEYS.forEach(([f, ks]) => ks.forEach(k => { keyMap[normKey(k)] = f; }));
+    text.replace(/\r/g, '').split('\n').forEach(line => {
+      const t = line.replace(/^\s*```.*$/, '');
+      const m = t.match(/^\s*【([^】]+)】\s*(.*)$/);
+      if (m && keyMap[normKey(m[1])] && !cur) {
+        d[keyMap[normKey(m[1])]] = m[2].trim();
+        return;
+      }
+      const s = t.match(/^\s*■\s*(?:\d+[\s.．:：、]*)?(.*)$/);
+      if (s) { cur = { title: s[1].trim(), body: '', verify: '' }; sections.push(cur); return; }
+      if (!cur) { if (t.trim()) { cur = { title: '', body: '', verify: '' }; sections.push(cur); } else return; }
+      cur.body += (cur.body ? '\n' : '') + t.replace(/\s+$/, '');
+    });
+    sections.forEach(s => { s.body = s.body.replace(/^\n+|\n+$/g, ''); });
+    if (sections.length) d.sections = sections;
+    d.kai = (d.kai || '').replace(/[第回\s]/g, '');
+    d.type = normType(d.type);
+    if (TEMPLATES[d.type]) d.hiyari = d.hiyari || TEMPLATES[d.type].hiyari;
+    if (d.sections.some(s => /ヒヤリハット/.test(s.title))) d.hiyari = true;
+    d.updated = Date.now();
+    return d;
+  }
+
+  // ---------------- AI要約用プロンプト ----------------
+  function buildPrompt(draft, sourceText, settings) {
+    const st = Object.assign({}, DEFAULT_SETTINGS, settings || {});
+    const type = draft.type || '打合せ';
+    const secs = (TEMPLATES[type] || TEMPLATES['打合せ']).sections;
+    return [
+      'あなたは上下水処理設備メーカー（株式会社サンエイ）の設計担当者です。',
+      '以下の議事録を、社内ワークフロー「SMILE V」の打合議事録（打合事項欄）へ転記するために要約してください。',
+      '',
+      '# ルール',
+      `- 打合事項は1行${st.limit}文字×最大${st.maxRows}行の欄に入る。見出し行・本文の各行（${st.limit}字を超える行は折返しで2行以上になる）・最後の「以上」1行を含め、合計${st.maxRows}行以内に必ず収める（目安：本文は合計${Math.round((st.maxRows - secs.length - 1) * st.limit * 0.8)}字以内）。`,
+      '- 文体は「である調」または体言止め。敬語・挨拶・相づち・重複は削る。',
+      '- 決定事項・数値・日付・担当・期限は必ず残す。不明点は【要確認】のまま残す。',
+      '- 箇条書きは「・」で始める。1項目は1〜2文で簡潔に。',
+      `- 構成（■見出し）は内容に応じて決めてよい。標準は「${secs.join('」「')}」。`,
+      draft.hiyari ? '- 現場に行った打合せのため、最後に「■ヒヤリハット報告」を必ず入れる（無ければ「特になし」）。' : '',
+      '- 下記の出力形式だけをコードブロックで出力し、説明文は付けない。',
+      '',
+      '# 出力形式',
+      '```',
+      '【種別】' + type,
+      '【第】回数の数字（不明なら空欄）',
+      '【件名】' + (draft.kenmei || '（例）（施工）○○浄化センター 汚泥脱水設備'),
+      '【打合日時】yyyy/mm/dd',
+      '【打合場所】',
+      '【打合者（客先1）】会社名：氏名様、氏名様',
+      '【打合者（客先2）】',
+      '【打合者（社内）】氏名、氏名',
+      '■1 ' + secs[0],
+      '本文',
+      '・箇条書き',
+      '■2 ' + (secs[1] || '…'),
+      '…',
+      '```',
+      '',
+      '# 議事録',
+      sourceText || '（ここに議事録本文を貼り付け）',
+    ].filter(x => x !== '').join('\n').replace(/\n# /g, '\n\n# ');
+  }
+
+  // ---------------- 簡潔化（ルールベース） ----------------
+  const SIMPLIFY = [
+    [/させていただきました/g, 'した'], [/させていただきます/g, 'する'], [/させていただく/g, 'する'],
+    [/していただきました/g, 'いただいた'], [/いただきました/g, 'いただいた'], [/いただきます/g, 'いただく'],
+    [/となりました/g, 'となった'], [/になりました/g, 'になった'], [/ありました/g, 'あった'],
+    [/行いました/g, '行った'], [/しました/g, 'した'], [/されました/g, 'された'], [/きました/g, 'きた'],
+    [/りました/g, 'った'], [/いました/g, 'いた'], [/ました/g, 'た'],
+    [/でしたが/g, 'であったが'], [/でした。/g, 'であった。'], [/でした$/gm, 'であった'],
+    [/ではありません/g, 'ではない'], [/ありません/g, 'ない'], [/できません/g, 'できない'], [/ません/g, 'ない'],
+    [/致します/g, 'する'], [/いたします/g, 'する'], [/します。/g, 'する。'], [/します$/gm, 'する'],
+    [/されます/g, 'される'], [/できます/g, 'できる'], [/なります/g, 'なる'], [/あります/g, 'ある'], [/おります/g, 'いる'], [/います/g, 'いる'],
+    [/予定です/g, '予定'], [/必要です/g, '必要'], [/とのことです/g, 'とのこと'], [/です。/g, '。'], [/です$/gm, ''],
+    [/(?:えー|あの|えっと|まあ)、?/g, ''], [/[ 　]{2,}/g, '　'],
+  ];
+  function simplify(text, opt) {
+    opt = opt || {};
+    let t = text || '';
+    if (!opt.noRule) SIMPLIFY.forEach(([a, b]) => { t = t.replace(a, b); });
+    if (opt.removeKakunin) t = t.replace(/【要確認[^】]*】/g, '');
+    if (opt.speakers && opt.speakers.length) {
+      const re = new RegExp('（(?:' + opt.speakers.map(esc).join('|') + ')(?:様)?(?:[、・](?:' + opt.speakers.map(esc).join('|') + ')(?:様)?)*）', 'g');
+      t = t.replace(re, '');
+    }
+    return t.replace(/[ 　]+$/gm, '');
+  }
+  function esc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+  // ---------------- docx 読込（ライブラリ不要） ----------------
+  async function unzip(buf) {
+    const dv = new DataView(buf), u8 = new Uint8Array(buf);
+    let eocd = -1;
+    for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--) {
+      if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    }
+    if (eocd < 0) throw new Error('docx(zip)形式ではありません');
+    const cnt = dv.getUint16(eocd + 10, true);
+    let p = dv.getUint32(eocd + 16, true);
+    const files = {};
+    const dec = new TextDecoder();
+    for (let n = 0; n < cnt; n++) {
+      if (dv.getUint32(p, true) !== 0x02014b50) break;
+      const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+      const nl = dv.getUint16(p + 28, true), el = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true);
+      const off = dv.getUint32(p + 42, true);
+      files[dec.decode(u8.subarray(p + 46, p + 46 + nl))] = { method, csize, off };
+      p += 46 + nl + el + cl;
+    }
+    return {
+      names: Object.keys(files),
+      async text(name) {
+        const f = files[name]; if (!f) return null;
+        const lnl = dv.getUint16(f.off + 26, true), lel = dv.getUint16(f.off + 28, true);
+        const start = f.off + 30 + lnl + lel;
+        const data = u8.slice(start, start + f.csize);
+        if (f.method === 0) return dec.decode(data);
+        const ds = new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+        return new Response(ds).text();
+      }
+    };
+  }
+
+  /** docx → ブロック列 [{type:'p',text}|{type:'tbl',rows:[[cell]]}] */
+  async function readDocx(arrayBuffer) {
+    const z = await unzip(arrayBuffer);
+    const xml = await z.text('word/document.xml');
+    const doc = new DOMParser().parseFromString(xml, 'application/xml');
+    const W = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+    const body = doc.getElementsByTagNameNS(W, 'body')[0];
+    const pText = p => {
+      let s = '';
+      const walk = n => {
+        for (const c of n.childNodes) {
+          if (c.nodeType !== 1) continue;
+          const ln = c.localName;
+          if (ln === 't') s += c.textContent;
+          else if (ln === 'tab') s += '\t';
+          else if (ln === 'br' || ln === 'cr') s += '\n';
+          else if (ln === 'del' || ln === 'instrText') continue;
+          else walk(c);
+        }
+      };
+      walk(p);
+      return s;
+    };
+    const cellText = tc => Array.from(tc.childNodes).filter(n => n.localName === 'p' || n.localName === 'tbl')
+      .map(n => n.localName === 'p' ? pText(n) : tblRows(n).map(r => r.join(' ')).join('\n')).join('\n');
+    const tblRows = tbl => Array.from(tbl.childNodes).filter(n => n.localName === 'tr')
+      .map(tr => Array.from(tr.childNodes).filter(n => n.localName === 'tc').map(cellText));
+    const blocks = [];
+    for (const n of body.childNodes) {
+      if (n.localName === 'p') blocks.push({ type: 'p', text: pText(n) });
+      else if (n.localName === 'tbl') blocks.push({ type: 'tbl', rows: tblRows(n) });
+      else if (n.localName === 'sdt') {
+        n.querySelectorAll && Array.from(n.getElementsByTagNameNS(W, 'p')).forEach(p => blocks.push({ type: 'p', text: pText(p) }));
+      }
+    }
+    return blocks;
+  }
+
+  function blocksToText(blocks) {
+    return blocks.map(b => b.type === 'p' ? b.text : b.rows.map(r => r.map(c => c.replace(/\n/g, ' ')).join(' | ')).join('\n')).join('\n');
+  }
+
+  // 「2026年10月13日(火) 15:59～」→ 2026/10/13
+  function parseDate(s) {
+    const m = (s || '').match(/(\d{4})\s*[年/.\-]\s*(\d{1,2})\s*[月/.\-]\s*(\d{1,2})/);
+    return m ? `${m[1]}/${m[2].padStart(2, '0')}/${m[3].padStart(2, '0')}` : '';
+  }
+
+  const OWN = /^(当社|弊社|社内|サンエイ|株式会社サンエイ)$/;
+  function parseAttendees(s) {
+    const own = [], others = [], speakers = [];
+    const re = /【([^】]+)】([^【]*)/g;
+    let m, hit = false;
+    while ((m = re.exec(s || ''))) {
+      hit = true;
+      const co = m[1].trim();
+      const names = m[2].replace(/\n/g, '、').split(/[、,，・\s]+/).map(x => x.replace(/（[^）]*）|\([^)]*\)/g, '').trim()).filter(Boolean);
+      names.forEach(n => speakers.push(n.replace(/様$/, '')));
+      if (OWN.test(co)) own.push(...names);
+      else { others.push(co + '：' + names.join('、')); speakers.push(co); }
+    }
+    if (!hit && s) own.push(s.trim());
+    return { shanai: own.join('、'), kyaku1: others[0] || '', kyaku2: others.slice(1).join('／'), speakers };
+  }
+
+  /**
+   * 会議録音ツール→Claude で作成した社内標準議事録(docx)を下書きに変換
+   * level: 'summary'(重要事項中心) | 'detail'(議題ごとの内容)
+   */
+  function docxToDraft(blocks, opt) {
+    opt = Object.assign({ level: 'summary', type: '打合せ', removeKakunin: false, removeSpeakers: true, simplify: true }, opt || {});
+    const d = newDraft(opt.type);
+    const tables = blocks.filter(b => b.type === 'tbl');
+    const norm = s => (s || '').replace(/[\s　]/g, '');
+    const kv = {};
+    let attendees = '';
+    // 会議情報テーブル
+    const meta = tables.find(t => t.rows.some(r => norm(r[0]) === '会議名'));
+    if (meta) meta.rows.forEach(r => {
+      for (let i = 0; i + 1 < r.length; i += 2) { const k = norm(r[i]); if (k && !(k in kv)) kv[k] = r[i + 1]; }
+      if (norm(r[0]) === '出席者') attendees = r[1];
+    });
+    d.kenmei = (kv['会議名'] || '').trim();
+    d.date = parseDate(kv['日時']) || d.date;
+    d.place = (kv['場所'] || '').trim();
+    const at = parseAttendees(attendees);
+    d.shanai = at.shanai; d.kyaku1 = at.kyaku1; d.kyaku2 = at.kyaku2;
+
+    const agenda = tables.find(t => t.rows[0] && norm(t.rows[0][1]) === '議題');
+    const decide = tables.find(t => t.rows[0] && t.rows[0].some(c => norm(c) === '区分'));
+    const todo = tables.find(t => t.rows[0] && t.rows[0].some(c => norm(c).includes('宿題')));
+    const nextT = tables.filter(t => t !== meta && t.rows.some(r => norm(r[0]) === '主な議題'))[0];
+
+    // 段落を見出しで区切る
+    // 段落＋1列だけの表（枠囲みの本文）を、文書順に1行ずつ並べる
+    const paras = [];
+    blocks.forEach(b => {
+      if (b.type === 'p') paras.push(...b.text.split('\n'));
+      else if (b.rows.length && b.rows.every(r => r.length === 1)) b.rows.forEach(r => paras.push(...r[0].split('\n')));
+    });
+    const summary = [];
+    const topics = [];
+    let mode = null, topic = null;
+    paras.forEach(t => {
+      const n = norm(t);
+      if (!n) return;
+      if (/^■?重要事項/.test(n)) { mode = 'sum'; return; }
+      const tm = t.match(/^\s*【議題\s*(\d+)】\s*(.*)$/);
+      if (tm) { mode = 'topic'; topic = { title: tm[2].trim(), lines: [] }; topics.push(topic); return; }
+      if (/^\d+[.．]/.test(n) && n.length < 20) { mode = null; return; }
+      if (mode === 'sum') summary.push(t.trim());
+      else if (mode === 'topic') topic.lines.push(t.trim());
+    });
+
+    const sec = [];
+    // 1. 打合せ内容
+    let s1 = '';
+    if (kv['会議名']) {
+      const nm = kv['会議名'].trim().replace(/[\s　]*(について|に関して|の件)$/, '');
+      s1 += `${nm}について${agenda ? '、下記議題で' : ''}打合せを行った。\n`;
+    }
+    if (agenda) agenda.rows.slice(1).forEach(r => { if (norm(r[1])) s1 += `（${norm(r[0])}）${r[1].trim()}\n`; });
+    sec.push({ title: '打合せ内容', body: s1.trim() });
+    // 2. 打合せ結果
+    let s2 = '';
+    if (opt.level === 'detail' && topics.length) {
+      topics.forEach((tp, i) => {
+        s2 += `（${i + 1}）${tp.title}\n`;
+        tp.lines.forEach(l => { s2 += (l.startsWith('◆') ? l.replace(/^◆\s*/, '◇') : l) + '\n'; });
+      });
+    } else {
+      s2 = (summary.length ? summary : topics.flatMap(tp => tp.lines.filter(l => /^・/.test(l)))).join('\n');
+    }
+    sec.push({ title: '打合せ結果', body: s2.trim() });
+    // 3. 決定・保留
+    if (decide) {
+      const lines = [];
+      decide.rows.slice(1).forEach(r => {
+        const kind = norm(r[1]); const txt = (r[2] || '').split('\n');
+        if (!norm(r[2])) return;
+        if (opt.level === 'summary') { if (kind === '保留') lines.push(`・${txt[0].trim()}`); return; }
+        lines.push(`・【${kind}】${txt[0].trim()}`);
+        if (kind === '保留' && opt.level === 'detail') txt.slice(1).forEach(x => x.trim() && lines.push('　' + x.trim()));
+        else if (kind === '保留') { const c = txt.find(x => /再協議条件/.test(x)); if (c) lines.push('　→' + c.replace(/^.*?[:：]\s*/, '').trim()); }
+      });
+      if (lines.length) sec.push({ title: opt.level === 'summary' ? '保留事項' : '決定・保留事項', body: lines.join('\n') });
+    }
+    // 4. 宿題
+    if (todo) {
+      const h = todo.rows[0].map(norm);
+      const ci = k => h.findIndex(x => x.includes(k));
+      const iA = ci('宿題') >= 0 ? ci('宿題') : 1, iT = ci('担当'), iK = ci('期限');
+      const lines = todo.rows.slice(1).filter(r => norm(r[iA])).map(r => {
+        const val = i => (i >= 0 ? (r[i] || '').replace(opt.level === 'summary' ? /^\s*【要確認】\s*$/ : /^$/, '').trim() : '');
+        const extra = [val(iT) ? '担当：' + val(iT) : '', val(iK) ? '期限：' + val(iK) : ''].filter(Boolean).join('／');
+        return `・${r[iA].trim()}${extra ? '（' + extra + '）' : ''}`;
+      });
+      sec.push({ title: '宿題事項', body: lines.join('\n') });
+    }
+    // 5. 次回
+    if (nextT) {
+      const g = k => { const r = nextT.rows.find(r => norm(r[0]) === k); return r ? r[1].trim() : ''; };
+      const parts = [];
+      if (g('日時')) parts.push('日時：' + g('日時'));
+      if (g('場所')) parts.push('場所：' + g('場所'));
+      let body = parts.join('　');
+      if (g('主な議題')) body += (body ? '\n' : '') + '議題：' + g('主な議題');
+      sec.push({ title: '次回予定', body });
+    }
+    if (!sec.some(s => s.body)) sec.splice(0, sec.length, { title: '打合せ内容', body: paras.join('\n') });
+
+    const so = { removeKakunin: opt.removeKakunin, speakers: opt.removeSpeakers ? at.speakers : [] };
+    sec.forEach(s => { s.body = simplify(s.body, Object.assign({}, so, { noRule: !opt.simplify })); s.verify = ''; });
+    if (TEMPLATES[opt.type] && TEMPLATES[opt.type].hiyari) sec.push({ title: HIYARI_TITLE, body: '特になし', verify: '' });
+    d.sections = sec;
+    return d;
+  }
+
+  // ---------------- 行数上限に収める自動調整 ----------------
+  /** 短い行どうしを全角スペース区切りで1行にまとめる */
+  function packLines(body, limit) {
+    const lines = (body || '').split('\n').filter(l => l.trim());
+    const out = [];
+    lines.forEach(l => {
+      const t = l.replace(/\s+$/, '');
+      const last = out[out.length - 1];
+      if (last !== undefined && last.length + 1 + t.trim().length <= limit && !/[：:]$/.test(last)) out[out.length - 1] = last + '　' + t.trim();
+      else out.push(t);
+    });
+    return out.join('\n');
+  }
+  function fitRows(draft, settings) {
+    const st = Object.assign({}, DEFAULT_SETTINGS, settings || {});
+    const d = JSON.parse(JSON.stringify(draft));
+    const max = st.maxRows;
+    const count = () => buildRows(d, st).length;
+    const before = count();
+    const log = [];
+    const isAgenda = s => /打合せ内容|議題/.test(s.title || '');
+    const isNext = s => /次回/.test(s.title || '');
+    const steps = [
+      ['です・ます調を簡潔化', () => d.sections.forEach(s => { s.body = simplify(s.body); })],
+      ['議題の一覧を「、」でつなぐ', () => d.sections.filter(isAgenda).forEach(s => {
+        const ls = s.body.split('\n'); const head = ls.filter(l => !/^\s*[（(]\d+[）)]/.test(l)); const items = ls.filter(l => /^\s*[（(]\d+[）)]/.test(l));
+        if (items.length > 1) s.body = [...head, items.map(x => x.trim()).join('、')].join('\n');
+      })],
+      ['次回予定を1行に', () => d.sections.filter(isNext).forEach(s => { s.body = s.body.split('\n').filter(x => x.trim()).map(x => x.trim()).join('　'); })],
+      ['短い行を1行にまとめる', () => d.sections.forEach(s => { s.body = packLines(s.body, st.limit); })],
+      ['【要確認】表記を削除', () => d.sections.forEach(s => { s.body = s.body.replace(/【要確認[^】]*】/g, ''); })],
+      ['箇条書きの補足（括弧書き）を削除', () => d.sections.filter(s => !/宿題|ヒヤリ/.test(s.title)).forEach(s => {
+        s.body = s.body.split('\n').map(l => l.replace(/（[^（）]{8,}）/g, '')).join('\n'); s.body = packLines(s.body, st.limit);
+      })],
+      ['締めの「以上」を省略', () => { d.noEnd = true; }],
+    ];
+    for (const [name, fn] of steps) {
+      if (count() <= max) break;
+      const b = count(); fn(); const a = count();
+      if (a < b) log.push(`${name}（${b}→${a}行）`);
+    }
+    const after = count();
+    return { draft: d, before, after, ok: after <= max, log };
+  }
+
+  global.GJ = {
+    packLines, fitRows,
+    DEFAULT_SETTINGS, TEMPLATES, HIYARI_TITLE, normType, newDraft, uid, today,
+    wrapLine, buildRows, validate, draftToText, parseDraftText, buildPrompt,
+    simplify, readDocx, blocksToText, docxToDraft, parseDate, parseAttendees,
+  };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+</script>
+<script>
+/* =========================================================
+ * SMILE V 打合議事録 画面への自動転記エンジン
+ *   この関数は単体で動くように書いてある（コンソール貼付版でも toString() して使う）
+ *   画面の構造は「ラベル文字」「行番号」「アイコン」から推定するため、
+ *   SMILE V 側の内部IDが分からなくても動く設計。
+ * ========================================================= */
+var SMILE_FILLER = function (cfg) {
+  cfg = cfg || {};
+  const W = cfg.win || window;   // 別ウィンドウ（ポップアップ）を対象にする場合
+  'use strict';
+  const norm = s => (s || '').replace(/[\s　 ]/g, '').replace(/\(/g, '（').replace(/\)/g, '）')
+    .replace(/[１1]/g, '1').replace(/[２2]/g, '2').replace(/№|No\.?|NO\.?|ｎｏ/gi, 'No');
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // ---- 対象ドキュメント（iframe内も探索） ----
+  function docsOf(win) {
+    const out = [];
+    try { out.push(win.document); } catch (e) { return out; }
+    try { for (let i = 0; i < win.frames.length; i++) out.push(...docsOf(win.frames[i])); } catch (e) { }
+    return out;
+  }
+  function findGridHeader(doc) {
+    const els = doc.querySelectorAll('th,td,div,span,label');
+    for (const el of els) {
+      if (norm(el.textContent) === '打合事項' && el.children.length <= 3) return el;
+    }
+    return null;
+  }
+  function findDoc() {
+    for (const d of (cfg.selfOnly ? [W.document] : docsOf(W))) { try { if (findGridHeader(d)) return d; } catch (e) { } }
+    return null;
+  }
+
+  const isText = el => el && ((el.tagName === 'INPUT' && /^(text|search|)$/i.test(el.type || 'text')) || el.tagName === 'TEXTAREA');
+  const visible = el => !!(el && (el.offsetWidth || el.offsetHeight || el.getClientRects().length));
+  const editable = el => isText(el) && !el.disabled && !el.readOnly && visible(el);
+
+  // ---- 打合事項グリッドの行 ----
+  function getRows(doc) {
+    const head = findGridHeader(doc);
+    if (!head) return [];
+    // ヘッダから親をたどり、番号付きの行を含むコンテナを探す
+    let box = head;
+    let trs = [];
+    for (let i = 0; i < 12 && box; i++) {
+      box = box.parentElement;
+      if (!box) break;
+      trs = Array.from(box.querySelectorAll('tr')).filter(tr => {
+        const c = tr.cells && tr.cells[0];
+        return c && /^\d+$/.test(norm(c.textContent)) && tr.querySelector('input,textarea');
+      });
+      if (trs.length >= 2) break;
+    }
+    const headX = head.getBoundingClientRect();
+    return trs.map(tr => {
+      const ins = Array.from(tr.querySelectorAll('input,textarea')).filter(isText).filter(visible);
+      if (!ins.length) return null;
+      // 打合事項欄：ヘッダと横位置が一番重なる、幅が最大の入力欄
+      let main = ins.reduce((a, b) => overlap(b, headX) > overlap(a, headX) ? b : a, ins[0]);
+      if (overlap(main, headX) <= 0) main = ins.reduce((a, b) => b.offsetWidth > a.offsetWidth ? b : a, ins[0]);
+      const mx = main.getBoundingClientRect().left;
+      const left = ins.filter(x => x !== main && x.getBoundingClientRect().left < mx);
+      const right = ins.filter(x => x !== main && x.getBoundingClientRect().left > mx);
+      return {
+        tr, index: parseInt(norm(tr.cells[0].textContent), 10),
+        no: left[left.length - 1] || null, main, verify: right[0] || null,
+        active: editable(main),
+      };
+    }).filter(Boolean).sort((a, b) => a.index - b.index);
+  }
+  function overlap(el, r) {
+    const b = el.getBoundingClientRect();
+    return Math.min(b.right, r.right) - Math.max(b.left, r.left);
+  }
+
+  // ---- 行追加アイコン ----
+  function addIcon(row) {
+    const cand = Array.from(row.tr.querySelectorAll('img,a,button,span,i,input[type=image],input[type=button],svg'));
+    const byLabel = cand.find(e => /行追加|行挿入|追加/.test((e.title || '') + (e.alt || '') + (e.getAttribute('aria-label') || '') + (e.tagName === 'BUTTON' ? e.textContent : '')));
+    if (byLabel) return byLabel;
+    // 見つからなければ「コピー・貼付け・消去・行追加」の4番目
+    const cell = Array.from(row.tr.cells).find(c => c.querySelectorAll('img,a,button,i,svg,input[type=image]').length >= 3 && !c.querySelector('input[type=text],textarea'));
+    if (!cell) return null;
+    let icons = Array.from(cell.querySelectorAll('img,input[type=image],svg'));
+    if (icons.length < 4) icons = Array.from(cell.querySelectorAll('a,button,i'));
+    return icons[3] || icons[icons.length - 1] || null;
+  }
+  function clickEl(el) {
+    const w = el.ownerDocument.defaultView;
+    const target = el.closest('a,button') || el;
+    ['mouseover', 'mousedown', 'mouseup'].forEach(t => target.dispatchEvent(new w.MouseEvent(t, { bubbles: true, cancelable: true, view: w })));
+    if (typeof target.click === 'function') target.click();
+    else target.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true, view: w }));
+  }
+
+  // ---- 値の設定（SMILE V 側のイベントも発火させる） ----
+  function setVal(el, v) {
+    if (!el || el.disabled || el.readOnly) return false;
+    const w = el.ownerDocument.defaultView;
+    const proto = el.tagName === 'TEXTAREA' ? w.HTMLTextAreaElement.prototype : w.HTMLInputElement.prototype;
+    v = v == null ? '' : String(v);
+    if (el.maxLength > 0 && v.length > el.maxLength) v = v.slice(0, el.maxLength);
+    try { el.focus({ preventScroll: true }); } catch (e) { }
+    el.dispatchEvent(new w.Event('focus'));
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, v);
+    ['input', 'keyup', 'change'].forEach(t => el.dispatchEvent(new w.Event(t, { bubbles: true })));
+    el.dispatchEvent(new w.Event('blur'));
+    try { el.blur(); } catch (e) { }
+    return true;
+  }
+
+  // ---- 見出し部（ラベル → 入力欄） ----
+  function textNodes(doc, test) {
+    const out = [];
+    const tw = doc.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    let n;
+    while ((n = tw.nextNode())) if (test(norm(n.nodeValue))) out.push(n);
+    return out;
+  }
+  function allInputs(doc) { return Array.from(doc.querySelectorAll('input,textarea')).filter(isText).filter(visible); }
+  const after = (a, b) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING); // b は a の後
+
+  function fieldByLabel(doc, label) {
+    const L = norm(label);
+    const nodes = textNodes(doc, t => t === L);
+    if (!nodes.length) return null;
+    const node = nodes[0];
+    const cell = node.parentElement.closest('td,th') || node.parentElement;
+    // 同じセル内 → 右隣のセル → 文書順で次の入力欄
+    let el = Array.from(cell.querySelectorAll('input,textarea')).filter(isText).filter(visible)[0];
+    if (!el) {
+      let c = cell.nextElementSibling;
+      for (let i = 0; i < 2 && c && !el; i++, c = c.nextElementSibling) el = Array.from(c.querySelectorAll('input,textarea')).filter(isText).filter(visible)[0];
+    }
+    if (!el) el = allInputs(doc).find(i => after(node, i));
+    return el || null;
+  }
+  function titleInputs(doc) {
+    // 「第 [回数] 回 [件名] 打合書」
+    const dai = textNodes(doc, t => t === '第' || t.startsWith('第'))[0];
+    const end = textNodes(doc, t => t === '打合書' || t.endsWith('打合書'))[0];
+    if (!dai || !end) return {};
+    const ins = allInputs(doc).filter(i => after(dai, i) && after(i, end));
+    const kaiN = textNodes(doc, t => t === '回' || t.startsWith('回'))[0];
+    let kai = null, ken = null;
+    if (kaiN) {
+      kai = ins.filter(i => after(i, kaiN)).pop() || null;
+      ken = ins.filter(i => after(kaiN, i)).pop() || null;
+    } else if (ins.length >= 2) { kai = ins[0]; ken = ins[ins.length - 1]; }
+    else ken = ins[0] || null;
+    return { kai, ken };
+  }
+
+  const HEADER_FIELDS = [
+    ['date', '打合日時'], ['place', '打合場所'], ['juchu', '受注No'],
+    ['kyaku1', '打合者（客先1）'], ['kyaku2', '打合者（客先2）'], ['shanai', '打合者（社内）'],
+  ];
+
+  // ---- 検出 ----
+  function detect() {
+    const doc = findDoc();
+    if (!doc) return { ok: false, msg: '打合議事録の入力画面（打合事項の表）が見つかりません。' };
+    const rows = getRows(doc);
+    const act = rows.filter(r => r.active);
+    const limit = act[0] && act[0].main.maxLength > 0 ? act[0].main.maxLength : 0;
+    return { ok: rows.length > 0, doc, rows, activeCount: act.length, totalRows: rows.length, limit,
+      msg: rows.length ? '' : '打合事項の行が検出できませんでした。' };
+  }
+
+  // ---- 転記 ----
+  async function fill(payload, opt) {
+    opt = Object.assign({ overwrite: true, header: true, delay: 25, log: () => { } }, opt || {});
+    const log = opt.log;
+    const det = detect();
+    if (!det.ok) throw new Error(det.msg);
+    const doc = det.doc;
+    const res = { header: {}, rows: 0, skipped: [], limit: det.limit };
+    let rowsData = payload.rows || [];
+
+    if (det.limit && payload.limit && det.limit < payload.limit && opt.rewrap) {
+      rowsData = opt.rewrap(det.limit);
+      log(`SMILE V の文字数上限 ${det.limit} 字に合わせて折返し直しました。`);
+    }
+
+    // 見出し
+    if (opt.header && payload.header) {
+      const h = payload.header;
+      const t = titleInputs(doc);
+      if (h.kai) res.header.kai = setVal(t.kai, h.kai);
+      if (h.kenmei) res.header.kenmei = setVal(t.ken, h.kenmei);
+      for (const [k, label] of HEADER_FIELDS) {
+        if (!h[k]) continue;
+        const el = fieldByLabel(doc, label);
+        res.header[k] = setVal(el, h[k]);
+        if (!res.header[k]) res.skipped.push(label);
+        await sleep(opt.delay);
+      }
+    }
+
+    // 打合事項
+    let rows = getRows(doc);
+    let start = 0;
+    if (!opt.overwrite) {
+      const lastUsed = rows.filter(r => r.active && r.main.value.trim()).pop();
+      start = lastUsed ? rows.indexOf(lastUsed) + 1 : 0;
+    }
+    for (let i = 0; i < rowsData.length; i++) {
+      const pos = start + i;
+      rows = getRows(doc);
+      let tries = 0;
+      while ((!rows[pos] || !rows[pos].active) && tries < 3) {
+        const lastActive = rows.filter(r => r.active).pop();
+        if (!lastActive) throw new Error('入力可能な行がありません。');
+        const icon = addIcon(lastActive);
+        if (!icon) throw new Error('「行追加」アイコンが見つかりません。構造診断を実行してください。');
+        const before = rows.filter(r => r.active).length;
+        clickEl(icon);
+        for (let w = 0; w < 40; w++) {
+          await sleep(75);
+          rows = getRows(doc);
+          if (rows.filter(r => r.active).length > before) break;
+        }
+        tries++;
+      }
+      if (!rows[pos] || !rows[pos].active) throw new Error(`${pos + 1}行目を追加できませんでした（行数の上限の可能性）。${i}行まで転記済み。`);
+      const r = rows[pos], d = rowsData[i];
+      if (r.no) setVal(r.no, d.no || '');
+      setVal(r.main, d.text || '');
+      if (r.verify && (d.verify || opt.overwrite)) setVal(r.verify, d.verify || '');
+      res.rows++;
+      log(`${pos + 1}行目 ${d.text.slice(0, 20)}`);
+      await sleep(opt.delay);
+    }
+    // 上書き時は残りの行を空にする
+    if (opt.overwrite) {
+      rows = getRows(doc);
+      rows.slice(start + rowsData.length).filter(r => r.active).forEach(r => {
+        if (r.main.value) setVal(r.main, '');
+        if (r.no && r.no.value) setVal(r.no, '');
+        if (r.verify && r.verify.value) setVal(r.verify, '');
+      });
+    }
+    try { getRows(doc)[start] && getRows(doc)[start].main.scrollIntoView({ block: 'center' }); } catch (e) { }
+    return res;
+  }
+
+  // ---- 画面 → データ読取（既存の申請を下書きへ取り込む） ----
+  function read() {
+    const det = detect();
+    if (!det.ok) throw new Error(det.msg);
+    const doc = det.doc;
+    const t = titleInputs(doc);
+    const header = { kai: t.kai ? t.kai.value : '', kenmei: t.ken ? t.ken.value : '' };
+    HEADER_FIELDS.forEach(([k, label]) => { const el = fieldByLabel(doc, label); header[k] = el ? el.value : ''; });
+    const rows = det.rows.filter(r => r.active).map(r => ({ no: r.no ? r.no.value : '', text: r.main.value, verify: r.verify ? r.verify.value : '' }));
+    while (rows.length && !rows[rows.length - 1].text && !rows[rows.length - 1].no) rows.pop();
+    return { header, rows };
+  }
+
+  // ---- 構造診断（うまく動かない時に情報を集める） ----
+  function diagnose() {
+    const doc = findDoc();
+    const rep = { url: W.location.href, frames: docsOf(W).length, found: !!doc };
+    if (!doc) {
+      rep.labels = docsOf(W).map(d => { try { return d.location.href + ' : ' + (d.body ? norm(d.body.textContent).slice(0, 200) : ''); } catch (e) { return 'cross-origin'; } });
+      return rep;
+    }
+    const rows = getRows(doc);
+    rep.rows = rows.length; rep.active = rows.filter(r => r.active).length;
+    rep.rowSamples = rows.slice(0, 3).map(r => ({
+      index: r.index, active: r.active, mainTag: r.main.outerHTML.slice(0, 300), maxLength: r.main.maxLength,
+      no: r.no && r.no.outerHTML.slice(0, 200), verify: r.verify && r.verify.outerHTML.slice(0, 200),
+      icons: Array.from(r.tr.querySelectorAll('img,a,button,i,svg,input[type=image]')).map(e => e.outerHTML.slice(0, 160)),
+      addIcon: (addIcon(r) || {}).outerHTML ? addIcon(r).outerHTML.slice(0, 200) : null,
+    }));
+    if (rows[2]) rep.row3 = rows[2].tr.outerHTML.slice(0, 1200);
+    rep.header = {};
+    HEADER_FIELDS.forEach(([k, label]) => { const el = fieldByLabel(doc, label); rep.header[label] = el ? el.outerHTML.slice(0, 200) : null; });
+    const t = titleInputs(doc);
+    rep.header['第回'] = t.kai ? t.kai.outerHTML.slice(0, 200) : null;
+    rep.header['件名'] = t.ken ? t.ken.outerHTML.slice(0, 200) : null;
+    return rep;
+  }
+
+  return { detect, fill, read, diagnose, version: '1.0.0' };
+};
+
+</script>
+<script>
+/* SMILE V 議事録アシスタント - アプリ画面 */
+(function () {
+  'use strict';
+  const $ = id => document.getElementById(id) || document.getElementById('sv_' + id);
+  const IS_EXT = false;
+  // 会議録音ツール（親画面）のスプシ連携・SMILE V のURL
+  const P = (() => { try { return window.parent !== window ? window.parent.SHEET : null; } catch (e) { return null; } })();
+  const X = (() => { try { return window.parent !== window ? window.parent.SMV : null; } catch (e) { return null; } })();
+  const sheetOk = () => !!(P && P.ready() && P.user());
+  const SMILE_URLS = ['http://smile-server/*', 'https://smile-server/*'];
+
+  // ---------------- 保存領域（拡張機能: chrome.storage / 単体HTML: localStorage） ----------------
+  // 下書きは名前ごとに保存（同じPCを別の人が使っても混ざらない）
+  const UK = () => { try { return (P && P.user && P.user()) || ''; } catch (e) { return ''; } };
+  const PER_USER = ['drafts', 'lastId', 'pending'];
+  const kname = k => 'gj_' + k + (PER_USER.includes(k) && UK() ? '@' + UK() : '');
+  const Store = {
+    async get(keys) {
+      if (IS_EXT) return chrome.storage.local.get(keys);
+      const o = {};
+      keys.forEach(k => { try { const v = localStorage.getItem(kname(k)); if (v) o[k] = JSON.parse(v); } catch (e) { } });
+      return o;
+    },
+    async set(obj) {
+      if (IS_EXT) return chrome.storage.local.set(obj);
+      Object.entries(obj).forEach(([k, v]) => { try { localStorage.setItem(kname(k), JSON.stringify(v)); } catch (e) { } });
+    },
+  };
+  const KEEP_DAYS = 180;   // 下書きの保存期間（半年）
+  // スプシ側（本人の名前に紐づけ）との同期：別のPC・スマホでも同じ下書きが出る
+  const blank = x => !x || (!x.kenmei && !x.place && !x.shanai && !x.kyaku1 && !(x.sections || []).some(t => (t.body || '').trim() && t.body.trim() !== '特になし'));
+  const SV = {
+    timer: {}, warned: false,
+    on() { return sheetOk(); },
+    warn(e) { if (this.warned) return; this.warned = true; if (/不明な操作/.test(e.message)) toast('スプシ側が古い版のため、下書きはこの端末だけに保存されています'); },
+    push(d) {
+      if (!this.on() || !d || !d.id || blank(d)) return;   // 空の下書きは送らない
+      clearTimeout(this.timer[d.id]);
+      this.timer[d.id] = setTimeout(() => P.gas({ action: 'dPut', user: P.user(), draft: d }).catch(e => this.warn(e)), 1500);
+    },
+    del(id) { if (this.on()) P.gas({ action: 'dDel', user: P.user(), id }).catch(e => this.warn(e)); },
+    async pull() {
+      if (!this.on()) return;
+      try {
+        const j = await P.gas({ action: 'dGet', user: P.user() });
+        const sv = j.drafts || {}; let changed = false;
+        Object.values(sv).forEach(x => {
+          if (!x || !x.id) return;
+          const l = drafts[x.id];
+          if (x.deleted) { if (l && (l.updated || 0) <= x.updated) { delete drafts[x.id]; changed = true; } return; }
+          if (!l || (l.updated || 0) < (x.updated || 0)) { x.type = GJ.normType(x.type); drafts[x.id] = x; changed = true; }
+        });
+        Object.values(drafts).forEach(l => { const x = sv[l.id]; if (!x || (!x.deleted && (x.updated || 0) < (l.updated || 0))) this.push(l); });
+        // 開いた直後の空の下書きは、スプシ側の下書きがあれば片付ける
+        if (changed && cur && blank(cur) && Object.values(drafts).some(x => x.id !== cur.id && !blank(x))) { delete drafts[cur.id]; cur = null; }
+        if (changed) {
+          await Store.set({ drafts });
+          if (cur && drafts[cur.id]) cur = drafts[cur.id];
+          else { const r = Object.values(drafts).sort((a, b) => b.updated - a.updated); if (r.length) cur = r[0]; else return createNew('打合せ'); }
+          renderAll();
+        }
+      } catch (e) { this.warn(e); }
+    },
+  };
+
+  let drafts = {}, settings = Object.assign({}, GJ.DEFAULT_SETTINGS), cur = null;
+  const undoStack = [];
+
+  // ---------------- 初期化 ----------------
+  async function init() {
+    
+    const types = Object.keys(GJ.TEMPLATES);
+    ['f_type', 'impType'].forEach(id => { $(id).innerHTML = types.map(t => `<option>${t}</option>`).join(''); });
+    $('impType').value = '打合せ';
+    // 旧版（名前で分けていなかった頃）の下書きを、今の名前に引き継ぐ
+    try { if (UK() && !localStorage.getItem(kname('drafts')) && localStorage.getItem('gj_drafts')) { localStorage.setItem(kname('drafts'), localStorage.getItem('gj_drafts')); localStorage.removeItem('gj_drafts'); } } catch (e) { }
+    const o = await Store.get(['drafts', 'settings', 'pending', 'lastId']);
+    drafts = o.drafts || {};
+    const lim = Date.now() - KEEP_DAYS * 864e5;   // 半年より前の下書きは消す
+    Object.keys(drafts).forEach(k => { const x = drafts[k]; if (!x || (x.updated || x.created || 0) < lim) delete drafts[k]; });
+    Object.values(drafts).forEach(d => { if (d) d.type = GJ.normType(d.type); });
+    settings = Object.assign({}, GJ.DEFAULT_SETTINGS, o.settings || {});
+    if (!settings.maxRowsUser && settings.maxRows !== 30) { settings.maxRows = 30; Store.set({ settings }); }
+    const id = (o.pending && drafts[o.pending]) ? o.pending : (o.lastId && drafts[o.lastId]) ? o.lastId : null;
+    if (id) select(id); else createNew('打合せ');
+    bind();
+    SV.pull();
+    if (IS_EXT) chrome.storage.onChanged.addListener(ch => {
+      if (ch.drafts) { const nd = ch.drafts.newValue || {}; Object.keys(nd).forEach(k => { if (!drafts[k] || (cur && k !== cur.id)) drafts[k] = nd[k]; if (cur && k === cur.id) cur.transferred = nd[k].transferred; }); renderList(); }
+      if (ch.settings) { settings = Object.assign({}, GJ.DEFAULT_SETTINGS, ch.settings.newValue); renderPreview(); }
+    });
+  }
+
+  // ---------------- 保存 ----------------
+  let saveTimer = null;
+  function touch(noUndo) {
+    if (!cur) return;
+    cur.updated = Date.now();
+    drafts[cur.id] = cur;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => Store.set({ drafts, lastId: cur.id }), 400);
+    SV.push(cur);
+    renderList(); renderPreview(); renderAlerts();
+  }
+  function pushUndo() {
+    undoStack.push(JSON.stringify(cur));
+    if (undoStack.length > 30) undoStack.shift();
+  }
+  let typingSnap = null, typingTimer = null;
+  function typingUndo() { // 入力中は1秒単位でまとめて Undo に積む
+    if (!typingSnap) { typingSnap = JSON.stringify(cur); }
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(() => { undoStack.push(typingSnap); typingSnap = null; }, 1000);
+  }
+  function undo() {
+    if (typingSnap) { undoStack.push(typingSnap); typingSnap = null; }
+    const s = undoStack.pop();
+    if (!s) return toast('これ以上戻せません');
+    cur = JSON.parse(s); drafts[cur.id] = cur;
+    renderAll(); touch(); toast('元に戻しました');
+  }
+
+  // ---------------- 下書き操作 ----------------
+  function createNew(type, base) {
+    const d = GJ.newDraft(type);
+    if (base) Object.assign(d, base, { id: d.id, created: d.created, updated: d.updated, transferred: null });
+    drafts[d.id] = d;
+    select(d.id);
+    touch();
+  }
+  function select(id) {
+    cur = drafts[id];
+    undoStack.length = 0;
+    renderAll();
+    Store.set({ lastId: id });
+  }
+  function nextFromCurrent() {
+    if (!cur) return;
+    const base = JSON.parse(JSON.stringify(cur));
+    base.kai = base.kai && /^\d+$/.test(base.kai) ? String(+base.kai + 1) : base.kai;
+    base.date = GJ.today();
+    base.sections = base.sections.map(s => ({ title: s.title, body: /ヒヤリハット/.test(s.title) ? '特になし' : '', verify: '' }));
+    base.memo = ''; delete base.sourceText;
+    createNew(base.type, base);
+    toast(`第${base.kai || '?'}回の下書きを作成しました`);
+  }
+
+  // ---------------- 描画 ----------------
+  function renderAll() { renderHead(); renderSections(); renderList(); renderPreview(); renderAlerts(); renderDatalists(); }
+
+  const FIELDS = ['kai', 'kenmei', 'date', 'place', 'juchu', 'kyaku1', 'kyaku2', 'shanai', 'memo'];
+  function renderHead() {
+    FIELDS.forEach(f => { $('f_' + f).value = cur[f] || ''; });
+    $('f_type').value = cur.type || '打合せ';
+    $('f_hiyari').checked = !!cur.hiyari;
+    $('limitLbl').textContent = settings.limit;
+    $('tplSel').innerHTML = '<option value="">見出しを追加…</option>' +
+      [...new Set(Object.values(GJ.TEMPLATES).flatMap(t => t.sections))].map(s => `<option>${s}</option>`).join('');
+  }
+
+  function renderList() {
+    const q = $('search').value.trim();
+    const list = Object.values(drafts).sort((a, b) => b.updated - a.updated)
+      .filter(d => !q || JSON.stringify([d.kenmei, d.place, d.date, d.kyaku1, d.shanai, d.sections]).includes(q));
+    $('list').innerHTML = list.map(d => `
+      <li data-id="${d.id}" class="${cur && d.id === cur.id ? 'sel' : ''}">
+        <div class="t1">${esc(d.kenmei || '(件名なし)')}</div>
+        <div class="t2"><span>${esc(d.date || '')} 第${esc(d.kai || '-')}回 <span class="badge type">${esc(d.type || '')}</span></span>
+        ${d.transferred ? '<span class="badge" title="' + new Date(d.transferred).toLocaleString() + '">転記済</span>' : ''}</div>
+      </li>`).join('');
+  }
+
+  function renderSections() {
+    const box = $('sections');
+    box.innerHTML = '';
+    cur.sections.forEach((s, i) => {
+      const el = document.createElement('div');
+      el.className = 'sec' + (/ヒヤリハット/.test(s.title) ? ' hiyari' : '');
+      el.dataset.i = i;
+      el.innerHTML = `
+        <div class="sec-h">
+          <span class="num">${i + 1}</span>
+          <input class="ttl" value="${escA(s.title)}" placeholder="見出し（例：打合せ結果）">
+          <input class="vf" value="${escA(s.verify || '')}" placeholder="検証（担当/日付）" title="検証欄（見出し行に入ります）">
+          <button data-a="up" title="上へ">↑</button><button data-a="down" title="下へ">↓</button>
+          <button data-a="del" title="削除" class="danger">✕</button>
+        </div>
+        <textarea placeholder="本文（改行ごとに行が分かれます。長い行は自動で折返し）">${esc(s.body || '')}</textarea>
+        <div class="meta"></div>`;
+      const ta = el.querySelector('textarea');
+      autosize(ta);
+      el.querySelector('.ttl').addEventListener('input', e => { typingUndo(); s.title = e.target.value; el.classList.toggle('hiyari', /ヒヤリハット/.test(s.title)); touch(); });
+      el.querySelector('.vf').addEventListener('input', e => { typingUndo(); s.verify = e.target.value; touch(); });
+      ta.addEventListener('input', () => { typingUndo(); s.body = ta.value; autosize(ta); touch(); updMeta(); });
+      ta.addEventListener('focus', () => { document.querySelectorAll('.sec.active').forEach(x => x.classList.remove('active')); el.classList.add('active'); highlightPv(i); });
+      el.querySelector('.sec-h').addEventListener('click', e => {
+        const a = e.target.dataset.a; if (!a) return;
+        pushUndo();
+        if (a === 'up' && i > 0) [cur.sections[i - 1], cur.sections[i]] = [cur.sections[i], cur.sections[i - 1]];
+        if (a === 'down' && i < cur.sections.length - 1) [cur.sections[i + 1], cur.sections[i]] = [cur.sections[i], cur.sections[i + 1]];
+        if (a === 'del') { if ((s.body || '').trim() && !confirm(`「${s.title}」を削除しますか？`)) { undoStack.pop(); return; } cur.sections.splice(i, 1); }
+        if (a === 'simp') s.body = GJ.simplify(s.body, { speakers: speakersOf() });
+        renderSections(); touch();
+      });
+      const updMeta = () => {
+        const n = GJ.buildRows({ sections: [s] }, Object.assign({}, settings, { addEnd: false, blankRow: false })).length;
+        el.querySelector('.meta').textContent = `${(s.body || '').replace(/\n/g, '').length}字 → ${n}行`;
+      };
+      updMeta();
+      box.appendChild(el);
+    });
+  }
+  function autosize(ta) { ta.style.height = 'auto'; ta.style.height = Math.min(600, ta.scrollHeight + 4) + 'px'; }
+
+  function renderPreview() {
+    if (!cur) return;
+    const rows = GJ.buildRows(cur, settings);
+    const mx = settings.maxRows;
+    $('pvBody').innerHTML = rows.map((r, i) => (i === mx ? `<tr class="cutline"><td colspan="4">▲ SMILE V の入力上限 ${mx} 行　▼ ここから下（${rows.length - mx} 行）は入力できません</td></tr>` : '') + `
+      <tr class="${r.kind}${r.text.length > settings.limit ? ' over' : ''}${i >= mx ? ' beyond' : ''}" data-sec="${r.sec ?? ''}">
+        <td>${i + 1}</td><td>${esc(r.no)}</td><td>${esc(r.text)}</td><td>${r.text.length}</td></tr>`).join('');
+    $('btnFit').textContent = `${mx}行に自動調整`;
+    $('btnFit').classList.toggle('pri', rows.length > mx);
+    const over = rows.length > settings.maxRows;
+    $('pvStat').innerHTML = `<b style="color:${over ? 'var(--err)' : 'var(--ok)'}">${rows.length}</b> / ${settings.maxRows} 行 ／ 1行 ${settings.limit} 字` + (cur.transferred ? ` ／ <span class="ok">転記済 ${new Date(cur.transferred).toLocaleString()}</span>` : '');
+  }
+  function highlightPv(i) {
+    const tr = document.querySelector(`#pvBody tr[data-sec="${i}"]`);
+    if (tr) tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  function renderAlerts() {
+    const v = GJ.validate(cur, settings);
+    $('alerts').innerHTML = v.errors.map(e => `<div class="al e">⚠ ${esc(e)}</div>`).join('') +
+''; // 注意事項は転記時に表示
+  }
+
+  function renderDatalists() {
+    const all = Object.values(drafts);
+    const uniq = f => [...new Set(all.map(d => d[f]).filter(Boolean))].slice(0, 40);
+    $('dl_kenmei').innerHTML = uniq('kenmei').map(v => `<option value="${escA(v)}">`).join('');
+    $('dl_place').innerHTML = [...new Set(['サンエイ会議室01', '現場', 'オンライン（Teams）', ...uniq('place')])].map(v => `<option value="${escA(v)}">`).join('');
+    $('dl_kyaku').innerHTML = [...new Set([...uniq('kyaku1'), ...uniq('kyaku2')])].map(v => `<option value="${escA(v)}">`).join('');
+    $('dl_shanai').innerHTML = uniq('shanai').map(v => `<option value="${escA(v)}">`).join('');
+  }
+
+  // ---------------- イベント ----------------
+  function bind() {
+    ['btnAI', 'btnSimplify'].forEach(id => { const b = document.createElement('button'); b.id = 'sv_' + id; b.hidden = true; document.body.appendChild(b); });
+    FIELDS.forEach(f => $('f_' + f).addEventListener('input', e => { typingUndo(); cur[f] = e.target.value; touch(); }));
+    $('f_date').addEventListener('change', e => { const d = GJ.parseDate(e.target.value.replace(/^(\d{4})(\d{2})(\d{2})$/, '$1/$2/$3')); if (d) { cur.date = d; e.target.value = d; touch(); } });
+    $('f_type').addEventListener('change', e => {
+      pushUndo();
+      cur.type = e.target.value;
+      const t = GJ.TEMPLATES[cur.type];
+      if (t.hiyari) cur.hiyari = true;
+      const empty = cur.sections.every(s => !(s.body || '').trim() || s.body.trim() === '特になし');
+      if (empty || confirm('見出しをこの種別の標準構成に入れ替えますか？（本文は同じ順番で引き継ぎます）')) {
+        const old = cur.sections;
+        cur.sections = t.sections.map((title, i) => ({ title, body: (old[i] && !/ヒヤリハット/.test(old[i].title) ? old[i].body : '') || (title === GJ.HIYARI_TITLE ? '特になし' : ''), verify: '' }));
+      }
+      ensureHiyari(); renderAll(); touch();
+    });
+    $('f_hiyari').addEventListener('change', e => {
+      pushUndo(); cur.hiyari = e.target.checked;
+      if (cur.hiyari) ensureHiyari();
+      else {
+        const filled = cur.sections.filter(s => /ヒヤリハット/.test(s.title) && (s.body || '').trim() && s.body.trim() !== '特になし');
+        if (filled.length && !confirm('ヒヤリハット報告に記入があります。セクションを削除しますか？')) { cur.hiyari = true; e.target.checked = true; undoStack.pop(); return; }
+        cur.sections = cur.sections.filter(s => !/ヒヤリハット/.test(s.title));
+      }
+      renderSections(); touch();
+    });
+    $('btnAddSec').onclick = () => { pushUndo(); cur.sections.push({ title: $('tplSel').value || '', body: '', verify: '' }); $('tplSel').value = ''; renderSections(); touch(); focusLast(); };
+    $('tplSel').onchange = () => { if ($('tplSel').value) $('btnAddSec').click(); };
+    $('btnNew').onclick = () => createNew('打合せ');
+    $('btnNext').onclick = nextFromCurrent;
+    $('btnUndo').onclick = undo;
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); undo(); }
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); Store.set({ drafts }); toast('保存しました'); }
+    });
+    $('search').oninput = renderList;
+    $('list').onclick = e => { const li = e.target.closest('li'); if (li) select(li.dataset.id); };
+    $('btnDelete').onclick = async () => {
+      if (!cur || !confirm(`「${cur.kenmei || '(件名なし)'}」を削除しますか？`)) return;
+      delete drafts[cur.id]; SV.del(cur.id);
+      if (IS_EXT) await chrome.storage.local.set({ drafts }); else Store.set({ drafts });
+      const rest = Object.values(drafts).sort((a, b) => b.updated - a.updated);
+      if (rest.length) select(rest[0].id); else createNew('打合せ');
+    };
+    $('btnSimplify').onclick = () => {
+      pushUndo();
+      cur.sections.forEach(s => { s.body = GJ.simplify(s.body, { speakers: speakersOf() }); });
+      renderSections(); touch(); toast('です・ます調 → である調に簡潔化しました（↶で戻せます）');
+    };
+    $('btnFit').onclick = () => {
+      const r = GJ.fitRows(cur, settings);
+      if (r.before <= settings.maxRows) return toast(`既に ${r.before} 行で上限内です`);
+      pushUndo();
+      cur = Object.assign(r.draft, { id: cur.id }); drafts[cur.id] = cur;
+      renderAll(); touch();
+      fitReport(r);
+    };
+    $('pvBody').onclick = e => {
+      const tr = e.target.closest('tr'); if (!tr || tr.dataset.sec === '') return;
+      const ta = document.querySelector(`.sec[data-i="${tr.dataset.sec}"] textarea`); if (ta) { ta.focus(); ta.scrollIntoView({ block: 'center' }); }
+    };
+
+    // その他メニュー
+    $('btnMore').onclick = e => { e.stopPropagation(); $('moreMenu').classList.toggle('hidden'); };
+    document.addEventListener('click', () => $('moreMenu').classList.add('hidden'));
+    $('moreMenu').onclick = e => { const a = e.target.dataset.act; if (a) more(a); };
+
+    bindImport(); bindAI(); bindTransfer(); bindSettings();
+    $('helpClose').onclick = () => $('dlgHelp').close();
+    $('jsonFile').onchange = importJson;
+  }
+  function fitReport(r) {
+    const msg = `${r.before} 行 → ${r.after} 行` + (r.log.length ? '\n\n実施した調整：\n・' + r.log.join('\n・') : '');
+    if (r.ok) toast(`${settings.maxRows}行に収めました（${r.before}→${r.after}行）。↶で戻せます`);
+    else alert(`自動調整しても ${settings.maxRows} 行に収まりませんでした（${msg}）。\n\n「AI要約（Claude）」で ${settings.maxRows} 行以内に要約するか、プレビューの赤い行を見ながら本文を削ってください。`);
+  }
+  function ensureHiyari() {
+    if (cur.hiyari && !cur.sections.some(s => /ヒヤリハット/.test(s.title))) cur.sections.push({ title: GJ.HIYARI_TITLE, body: '特になし', verify: '' });
+  }
+  function focusLast() { const t = document.querySelectorAll('.sec .ttl'); if (t.length) t[t.length - 1].focus(); }
+  function speakersOf() {
+    const s = GJ.parseAttendees(cur.attendeesRaw || '').speakers;
+    [cur.shanai, cur.kyaku1, cur.kyaku2].join('、').split(/[、,／:：\s]+/).forEach(x => { x = x.replace(/様$/, '').trim(); if (x && x.length <= 10) s.push(x); });
+    return [...new Set(s)];
+  }
+
+  async function more(a) {
+    $('moreMenu').classList.add('hidden');
+    if (a === 'ai') $('btnAI').click();
+    if (a === 'simplify') $('btnSimplify').click();
+    if (a === 'bm') { await Store.set({ bmDone: false }); bmDone = false; transfer(); }
+    if (a === 'copyText') { await copy(GJ.draftToText(cur)); toast('テキスト形式でコピーしました'); }
+    if (a === 'copyRows') { await copy(GJ.buildRows(cur, settings).map(r => (r.no ? r.no : '') + '\t' + r.text).join('\n')); toast('番号<TAB>打合事項 の形式でコピーしました'); }
+    if (a === 'console') { await copy(consoleScript()); toast('転記スクリプトをコピーしました。SMILE V 画面で F12 → Console に貼付け'); }
+    if (a === 'export') {
+      const blob = new Blob([JSON.stringify({ app: 'smilev-gijiroku', version: 1, drafts, settings }, null, 1)], { type: 'application/json' });
+      const a2 = document.createElement('a'); a2.href = URL.createObjectURL(blob); a2.download = `議事録下書き_${GJ.today().replace(/\//g, '')}.json`; a2.click();
+    }
+    if (a === 'importJson') $('jsonFile').click();
+    if (a === 'settings') openSettings();
+    if (a === 'help') $('dlgHelp').showModal();
+  }
+  async function importJson(e) {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      const o = JSON.parse(await f.text());
+      const ds = o.drafts || {};
+      let n = 0; Object.values(ds).forEach(d => { if (d && d.id) { drafts[d.id] = d; n++; } });
+      await Store.set({ drafts }); renderList(); toast(`${n} 件の下書きを読み込みました`);
+    } catch (err) { alert('読込みに失敗しました: ' + err.message); }
+    e.target.value = '';
+  }
+
+  // ---------------- 取込 ----------------
+  let impBlocks = null, impName = '';
+  function bindImport() {
+    $('btnImport').onclick = () => { impBlocks = null; impName = ''; $('impText').value = ''; $('drop').innerHTML = 'ここに .docx / .txt をドロップ<br><small>またはクリックして選択</small>'; $('dlgImport').showModal(); };
+    $('impCancel').onclick = () => $('dlgImport').close();
+    const drop = $('drop');
+    drop.onclick = () => $('file').click();
+    $('file').onchange = e => { if (e.target.files[0]) loadFile(e.target.files[0]); e.target.value = ''; };
+    drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+    drop.ondragleave = () => drop.classList.remove('over');
+    drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); };
+    // ダイアログ外にドロップしても取込
+    document.addEventListener('dragover', e => e.preventDefault());
+    document.addEventListener('drop', e => {
+      if ($('dlgImport').open) return;
+      e.preventDefault();
+      const f = e.dataTransfer.files[0];
+      if (f && /\.(docx|txt|md)$/i.test(f.name)) { $('btnImport').click(); loadFile(f); }
+    });
+    $('impGo').onclick = doImport;
+  }
+  async function loadFile(f) {
+    impName = f.name;
+    try {
+      if (/\.docx$/i.test(f.name)) {
+        impBlocks = await GJ.readDocx(await f.arrayBuffer());
+        $('impText').value = '';
+        $('drop').innerHTML = `<b>${esc(f.name)}</b><br><small>${impBlocks.length} ブロックを読み込みました</small>`;
+      } else {
+        impBlocks = null;
+        $('impText').value = await f.text();
+        $('drop').innerHTML = `<b>${esc(f.name)}</b>`;
+      }
+    } catch (e) { alert('ファイルを読めませんでした: ' + e.message); }
+  }
+  function doImport() {
+    const opt = { level: $('impLevel').value, type: $('impType').value, simplify: $('impSimplify').checked, removeSpeakers: $('impSpeaker').checked, removeKakunin: $('impKakunin').checked };
+    let d;
+    if (impBlocks) {
+      d = GJ.docxToDraft(impBlocks, opt);
+      d.sourceText = GJ.blocksToText(impBlocks);
+      const meta = impBlocks.find(b => b.type === 'tbl' && b.rows.some(r => r[0].replace(/\s/g, '') === '出席者'));
+      if (meta) d.attendeesRaw = meta.rows.find(r => r[0].replace(/\s/g, '') === '出席者')[1];
+    } else {
+      const t = $('impText').value.trim();
+      if (!t) return alert('ファイルをドロップするか、テキストを貼り付けてください。');
+      if (/^\s*(【[^】]+】|■)/m.test(t)) d = GJ.parseDraftText(t, GJ.newDraft(opt.type));
+      else { d = GJ.newDraft(opt.type); d.sections = [{ title: GJ.TEMPLATES[opt.type].sections[0], body: opt.simplify ? GJ.simplify(t) : t, verify: '' }]; if (GJ.TEMPLATES[opt.type].hiyari) d.sections.push({ title: GJ.HIYARI_TITLE, body: '特になし', verify: '' }); }
+      d.sourceText = t;
+      d.type = d.type || opt.type;
+    }
+    let fit = null;
+    if ($('impFit').checked) { fit = GJ.fitRows(d, settings); if (fit.before > settings.maxRows) { const id = d.id, src = d.sourceText, ar = d.attendeesRaw; d = Object.assign(fit.draft, { id, sourceText: src, attendeesRaw: ar }); } else fit = null; }
+    if ($('impKeepHead').checked && cur) { d.kai = cur.kai; d.kenmei = cur.kenmei; d.juchu = cur.juchu; }
+    d.memo = (impName ? '取込元: ' + impName : '') + (impBlocks && d.kenmei && !$('impKeepHead').checked ? '\n※件名には会議名が入っています。SMILE V 用の件名（工事名など）に直してください。' : '');
+    d.hiyari = d.hiyari || GJ.TEMPLATES[d.type]?.hiyari || false;
+    drafts[d.id] = d;
+    $('dlgImport').close();
+    select(d.id); touch();
+    if (fit) fitReport(fit); else toast('取込みました。右のプレビューで行数を確認してください');
+  }
+
+  // ---------------- AI要約 ----------------
+  function bindAI() {
+    $('btnAI').onclick = () => { $('aiSrc').value = cur.sourceText || ''; $('aiRes').value = ''; $('aiCopied').textContent = ''; $('dlgAI').showModal(); };
+    $('aiCancel').onclick = () => $('dlgAI').close();
+    $('aiCopy').onclick = async () => {
+      const src = $('aiSrc').value.trim() || GJ.draftToText(cur);
+      await copy(GJ.buildPrompt(cur, src, settings));
+      $('aiCopied').textContent = 'コピーしました → Claude に貼り付けて送信';
+    };
+    $('aiApply').onclick = () => {
+      const t = $('aiRes').value.trim();
+      if (!t) return alert('Claude の回答を貼り付けてください。');
+      pushUndo();
+      const keep = { id: cur.id, created: cur.created, sourceText: cur.sourceText, memo: cur.memo, attendeesRaw: cur.attendeesRaw };
+      const d = GJ.parseDraftText(t, cur);
+      ['kai', 'kenmei', 'juchu'].forEach(k => { if (!d[k]) d[k] = cur[k]; });
+      Object.assign(d, keep);
+      if (d.hiyari && !d.sections.some(s => /ヒヤリハット/.test(s.title))) d.sections.push({ title: GJ.HIYARI_TITLE, body: '特になし', verify: '' });
+      cur = d; drafts[d.id] = d;
+      $('dlgAI').close(); renderAll(); touch(); toast('AI要約を反映しました（↶で戻せます）');
+    };
+  }
+
+  // ---------------- 転記 ----------------
+  function payload() {
+    return {
+      header: { kai: cur.kai, kenmei: cur.kenmei, date: cur.date, place: cur.place, juchu: cur.juchu, kyaku1: cur.kyaku1, kyaku2: cur.kyaku2, shanai: cur.shanai },
+      rows: GJ.buildRows(cur, settings), limit: settings.limit,
+    };
+  }
+  function consoleScript() {
+    return `/* SMILE V 打合議事録 自動転記（${cur.kenmei || ''}） */\n(async () => {\nconst SMILE_FILLER = ${SMILE_FILLER.toString()};\n` +
+      `const F = SMILE_FILLER();\nconst r = await F.fill(${JSON.stringify(payload())}, { overwrite: true });\n` +
+      `alert('転記しました（' + r.rows + '行）' + (r.skipped.length ? '\\n入力できなかった項目: ' + r.skipped.join('、') : '') + '\\n内容を確認して下書き保存／申請してください。');\n` +
+      `})().catch(e => alert('転記エラー: ' + e.message));`;
+  }
+  let bmDone = false;
+  Store.get(['bmDone']).then(o => { bmDone = !!o.bmDone; });
+  function bindTransfer() {
+    $('btnTransfer').onclick = transfer;
+    $('trCancel').onclick = () => $('dlgTransfer').close();
+    $('trCopyScript').onclick = async () => { await copy(consoleScript()); setStatus('コピーしました。SMILE V の打合議事録の画面で F12 → Console に貼り付けて Enter。', 's'); };
+    $('trGo').onclick = async () => { bmDone = true; await Store.set({ bmDone: true }); $('dlgTransfer').close(); send(); };
+    $('bmLink').onclick = e => { e.preventDefault(); toast('クリックではなく、ブックマークバーまでドラッグしてください'); };
+    $('bmCopy').onclick = async () => { await copy('javascript:' + bookmarkletCode()); toast('コピーしました。ブックマークのURL欄、または SMILE V 画面の F12 → Console に貼り付けてください'); };
+  }
+  function openDlg(o) {
+    $('trCheck').innerHTML = (o.errors || []).map(e => `<div class="status e" style="margin:0 0 6px">⚠ ${esc(e)}</div>`).join('');
+    $('trBm').classList.toggle('hidden', !(o.bm || o.after));
+    $('trAfter').classList.toggle('hidden', !o.after);
+    $('trBm').querySelectorAll('p').forEach((x, i) => { if (i !== 1) x.classList.toggle('hidden', !!o.after); });
+    $('trGo').classList.toggle('hidden', !o.bm);
+    $('trNoSheet').classList.toggle('hidden', !o.noSheet);
+    $('trNoSheet').innerHTML = o.noSheet ? `<p>${esc(o.noSheet)}</p><p class="desc">代わりに：［転記スクリプトをコピー］→ SMILE V の打合議事録の画面で <kbd>F12</kbd> → Console に貼り付けて <kbd>Enter</kbd></p>` : '';
+    $('trCopyScript').classList.toggle('hidden', !o.noSheet);
+    if (o.bm || o.after) $('bmLink').href = bookmarkletUrl();
+    setStatus('', '');
+    $('dlgTransfer').showModal();
+  }
+  function transfer() {
+    Store.set({ drafts, pending: cur.id });
+    const v = GJ.validate(cur, settings);
+    if (v.errors.length) return openDlg({ errors: v.errors });
+    if (!P) return openDlg({ noSheet: 'この画面は会議録音ツールの「SMILE V 議事録」タブから開いてください。' });
+    if (!bmDone) return openDlg({ bm: true });
+    send();
+  }
+  // 転記データはインターネット上に置かず、開いた SMILE V の画面へ直接手渡す（ブックマークからの問い合わせに応答）
+  let OUTBOX = null;
+  const SMV_ORIGIN = (() => { try { return new URL(X.url).origin; } catch (e) { return ''; } })();
+  window.addEventListener('message', e => {
+    if (!e.data || !e.data.smvReq || !OUTBOX) return;
+    if (SMV_ORIGIN && e.origin !== SMV_ORIGIN) return;   // SMILE V の画面以外には渡さない
+    try { e.source.postMessage({ smvData: Object.assign({ ok: true }, OUTBOX) }, e.origin); } catch (x) { }
+  });
+  function send() {
+    OUTBOX = { title: `${cur.date || ''} 第${cur.kai || '-'}回 ${cur.kenmei || '(件名なし)'}`, data: Object.assign(payload(), { opt: { overwrite: true, header: true } }) };
+    if (X && X.url) window.open(X.url, 'smilev');   // SMILE V の打合議事録を新しいタブで開く（この画面とつながった状態で開く）
+    cur.transferred = Date.now(); touch();
+    openDlg({ after: true });
+  }
+  // ブックマーク本体：本体の処理は smv.js（ツールと同じ場所）から読み込むので、ツールを更新しても登録し直し不要
+  function bookmarkletUrl() {
+    const c = P.cfg();
+    // 共有フォルダ（file://）から開いた場合は、転記処理を公開サイトから読み込む
+    const here = window.parent.location.href;
+    const base = /^https?:/.test(here) ? here.split('#')[0].split('?')[0].replace(/[^/]*$/, '') : 'https://ooyasanei-debug.github.io/recorder/';
+    const code = '(function(){window.__SMV=' + JSON.stringify({ u: c.url, k: c.key, n: P.user() }) +
+      ';var s=document.createElement("script");s.charset="utf-8";s.src="' + base + 'smv.js?t="+Date.now();' +
+      's.onerror=function(){alert("SMILE V 転記：読み込めませんでした。ネットワークを確認してください。")};' +
+      '(document.head||document.documentElement).appendChild(s);})();';
+    return 'javascript:' + encodeURIComponent(code);
+  }
+  // コピー用：そのままブックマークのURL欄にも、F12 の Console にも貼り付けて動く形
+  function bookmarkletCode() { return decodeURIComponent(bookmarkletUrl().slice(11)); }
+  function setStatus(t, k) { const s = $('trStatus'); s.textContent = t; s.className = 'status ' + (k || '') + (t ? '' : ' hidden'); }
+
+  // ---------------- 設定 ----------------
+  function openSettings() {
+    ['limit', 'maxRows', 'endText'].forEach(k => { $('s_' + k).value = settings[k]; });
+    ['contIndent', 'bodyIndent', 'blankRow', 'addEnd', 'keepEmpty'].forEach(k => { $('s_' + k).checked = !!settings[k]; });
+    $('dlgSettings').showModal();
+  }
+  function bindSettings() {
+    $('sCancel').onclick = () => $('dlgSettings').close();
+    $('sSave').onclick = () => {
+      settings.limit = Math.max(10, +$('s_limit').value || 50);
+      settings.maxRows = Math.max(5, +$('s_maxRows').value || 30); settings.maxRowsUser = true;
+      settings.endText = $('s_endText').value;
+      ['contIndent', 'bodyIndent', 'blankRow', 'addEnd', 'keepEmpty'].forEach(k => { settings[k] = $('s_' + k).checked; });
+      Store.set({ settings });
+      $('dlgSettings').close(); renderAll();
+    };
+  }
+
+  // ---------------- util ----------------
+  function esc(s) { return String(s ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+  function escA(s) { return esc(s).replace(/"/g, '&quot;'); }
+  async function copy(t) {
+    try { await navigator.clipboard.writeText(t); }
+    catch (e) { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+  }
+  let tt = null;
+  function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2800); }
+
+  init();
+})();
+
+</script>
+</body>
+</html>
