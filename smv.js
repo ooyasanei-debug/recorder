@@ -311,7 +311,7 @@ var SMILE_FILLER = function (cfg) {
           try {
             var m = x.responseText.match(/\/\*@@CFG\*\/const BUILTIN_CFG=(\{[\s\S]*?\});\/\*CFG@@\*\//);
             var o = m && JSON.parse(m[1]);
-            if (o && o.url && o.key) { C.u = o.url; C.k = o.key; }
+            if (o && o.url) { C.u = o.url; C.k = o.key || ''; }
           } catch (e) { }
           fin();
         };
@@ -332,7 +332,7 @@ var SMILE_FILLER = function (cfg) {
         done(j);
       };
       s.onerror = function () { alert('SMILE V 転記：会議録音ツールのスプシに接続できません。\n・社内ネットワークで Google（script.google.com）への接続が止められていないか\n・Apps Script のデプロイが「新バージョン」になっているか\nを確認してください。'); };
-      if (!C.u || !C.k || !C.n) { alert('SMILE V 転記：設定が読み込めませんでした。会議録音ツールの［SMILE V 議事録］→［その他 ▾］→［ブックマークを登録し直す］で登録し直してください。'); return; }
+      if (!C.u || !C.n) { alert('SMILE V 転記：設定が読み込めませんでした。会議録音ツールの［SMILE V 議事録］→［その他 ▾］→［ブックマークを登録し直す］で登録し直してください。'); return; }
       s.src = C.u + '?a=smv&k=' + encodeURIComponent(C.k) + '&n=' + encodeURIComponent(C.n) + '&cb=' + cb + '&t=' + Date.now();
       (TOP.document.head || TOP.document.documentElement).appendChild(s);
     }
