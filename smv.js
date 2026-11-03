@@ -292,49 +292,30 @@ var SMILE_FILLER = function (cfg) {
     if (TOP.__smvWait) { TOP.__smvWait.again(); return; }
     var F = SF();
     var det = F.detect();
-    latestCfg(function () {
-      load(function (j) {
-        if (det.ok) show(j, F, det, TOP);
-        else wait(j);
-      });
+    load(function (j) {
+      if (det.ok) show(j, F, det, TOP);
+      else wait(j);
     });
 
-    // ---- 最新の連携先を公開中の index.html から読む（ブックマーク登録後に連携URLが変わっても動くように） ----
-    function latestCfg(next) {
-      var done = false, fin = function () { if (!done) { done = true; next(); } };
-      try {
-        var base = (C.base || 'https://ooyasanei-debug.github.io/recorder/');
-        var x = new XMLHttpRequest();
-        x.open('GET', base + 'index.html?t=' + Date.now());
-        x.timeout = 6000;
-        x.onload = function () {
-          try {
-            var m = x.responseText.match(/\/\*@@CFG\*\/const BUILTIN_CFG=(\{[\s\S]*?\});\/\*CFG@@\*\//);
-            var o = m && JSON.parse(m[1]);
-            if (o && o.url) { C.u = o.url; C.k = o.key || ''; }
-          } catch (e) { }
-          fin();
-        };
-        x.onerror = x.ontimeout = fin;
-        x.send();
-      } catch (e) { fin(); }
-      setTimeout(fin, 7000);
-    }
-
-    // ---- 送信データの取得（JSONP） ----
+    // ---- 送信データの取得：このSMILE Vの画面を開いた会議録音ツールから直接受け取る（ネット上には置かない） ----
     function load(done) {
-      var cb = '__smv' + Date.now();
-      var s = TOP.document.createElement('script');
-      TOP[cb] = function (j) {
-        try { delete TOP[cb]; } catch (e) { TOP[cb] = undefined; }
-        s.parentNode && s.parentNode.removeChild(s);
-        if (!j || !j.ok) { alert('SMILE V 転記：' + ((j && j.error) || 'データを取得できませんでした')); return; }
+      var op = null; try { op = TOP.opener; } catch (e) { }
+      if (!op) { alert('SMILE V 転記：会議録音ツールの［SMILE V へ転記 ▶］で開いた SMILE V の画面で押してください。\n（SMILE V を自分で開いた画面では使えません）'); return; }
+      var got = false;
+      function onMsg(e) {
+        if (e.source !== op || !e.data || !e.data.smvData) return;
+        got = true; TOP.removeEventListener('message', onMsg);
+        var j = e.data.smvData;
+        if (!j.ok) { alert('SMILE V 転記：' + (j.error || 'データを受け取れませんでした')); return; }
         done(j);
-      };
-      s.onerror = function () { alert('SMILE V 転記：会議録音ツールのスプシに接続できません。\n・社内ネットワークで Google（script.google.com）への接続が止められていないか\n・Apps Script のデプロイが「新バージョン」になっているか\nを確認してください。'); };
-      if (!C.u || !C.n) { alert('SMILE V 転記：設定が読み込めませんでした。会議録音ツールの［SMILE V 議事録］→［その他 ▾］→［ブックマークを登録し直す］で登録し直してください。'); return; }
-      s.src = C.u + '?a=smv&k=' + encodeURIComponent(C.k) + '&n=' + encodeURIComponent(C.n) + '&cb=' + cb + '&t=' + Date.now();
-      (TOP.document.head || TOP.document.documentElement).appendChild(s);
+      }
+      TOP.addEventListener('message', onMsg);
+      try { op.postMessage({ smvReq: 1 }, '*'); } catch (e) { }
+      setTimeout(function () {
+        if (got) return;
+        TOP.removeEventListener('message', onMsg);
+        alert('SMILE V 転記：会議録音ツールから応答がありません。\nツールの画面を開いたまま、もう一度［SMILE V 議事録］→［SMILE V へ転記 ▶］から開き直してください。');
+      }, 4000);
     }
 
     // ---- 打合議事録が別ウィンドウで開く場合：開くのを待ち受ける ----
