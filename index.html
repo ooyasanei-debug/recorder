@@ -305,7 +305,7 @@ setTimeout(function(){ if(window.__recOk) return; var d=document.createElement('
 "use strict";
 const $ = id => document.getElementById(id);
 const AUDIO_BPS = 48000, VIDEO_BPS = 1500000, SLICE_MS = 5000, CONV_BPS = 32000;
-/*@@CFG*/const BUILTIN_CFG={"url":"","key":""};/*CFG@@*/
+/*@@CFG*/const BUILTIN_CFG={"url":"https://script.google.com/macros/s/AKfycbzD-9bNYwKKvRBMagT2qbhy81kS-WMaeYHWmor0R1Q3JAofojScqwaTqfZr8aumCBa4GQ/exec","cid":"821499108634-4vhrpo1fjp2tcc858qq5ggkbsouls9e7.apps.googleusercontent.com"};/*CFG@@*/
 const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
                 set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
 const pad = n => String(n).padStart(2,'0');
