@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>会議録音ツール 動作チェック</title>
+<style>body{font-family:sans-serif;padding:16px;font-size:16px;line-height:1.6;color:#1d2330}h1{font-size:20px}
+li{margin:6px 0}.ok{color:#1f8a4c;font-weight:bold}.ng{color:#c62f2f;font-weight:bold}#ua{font-size:12px;color:#5d6575;word-break:break-all}
+a.btn{display:inline-block;background:#2457c5;color:#fff;padding:10px 16px;border-radius:8px;text-decoration:none;margin-top:10px}</style>
+</head><body>
+<h1>会議録音ツール 動作チェック</h1>
+<p>このページが表示されていれば、この端末から GitHub には接続できています。</p>
+<ol id="list"><li>チェック中…（この文字のまま変わらない場合は「プログラムが動いていない」状態です）</li></ol>
+<p>この画面をスクリーンショットして管理者に送ってください。</p>
+<p id="ua"></p>
+<a class="btn" href="./">ツールを開く</a>
+<script>
+// 古いブラウザでも動く書き方で書いています
+(function () {
+  var L = document.getElementById('list'), items = [];
+  function add(name, ok, note) { items.push('<li>' + name + '：<span class="' + (ok ? 'ok">OK' : 'ng">NG') + '</span>' + (note ? '（' + note + '）' : '') + '</li>'); L.innerHTML = items.join(''); }
+  var ua = navigator.userAgent; document.getElementById('ua').textContent = ua;
+  var m = ua.match(/Chrome\/(\d+)/), ver = m ? +m[1] : 0;
+  var wv = /; wv\)/.test(ua) || /Line\/|FBAN|Instagram|GSA\//.test(ua);
+  add('ブラウザ', !wv && ver >= 100, (wv ? 'アプリ内ブラウザです。Chrome で開き直してください／' : '') + (ver ? 'Chrome ' + ver : '不明'));
+  var modern = true; try { new Function('var a={b:1};return a?.b??0'); new Function('async()=>{}'); } catch (e) { modern = false; }
+  add('新しい書き方のプログラム', modern, modern ? '' : 'ブラウザが古いため動きません。Chrome を更新してください');
+  add('マイク機能', !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia), '');
+  add('画面の保存機能', 'serviceWorker' in navigator, '');
+  var t0 = Date.now(), x = new XMLHttpRequest();
+  x.open('GET', './index.html?check=' + t0); x.timeout = 20000;
+  x.onload = function () { add('ツール本体の読み込み', x.status === 200, (Date.now() - t0) + 'ミリ秒・' + Math.round((x.responseText || '').length / 1024) + 'KB'); g(); };
+  x.onerror = x.ontimeout = function () { add('ツール本体の読み込み', false, '読み込めません（社内の通信制限・フィルターの可能性）'); g(); };
+  x.send();
+  function g() {
+    var t1 = Date.now(), y = new XMLHttpRequest();
+    y.open('GET', 'https://accounts.google.com/gsi/client'); y.timeout = 20000;
+    y.onload = function () { add('Googleログインへの接続', y.status === 200, (Date.now() - t1) + 'ミリ秒'); };
+    y.onerror = y.ontimeout = function () { add('Googleログインへの接続', false, '接続できません（社内の通信制限・フィルターの可能性）'); };
+    y.send();
+  }
+})();
+</script>
+</body></html>

@@ -4,6 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>会議録音・議事録作成ツール</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2457c5">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <style>
   :root{--bg:#f4f5f7;--card:#fff;--ink:#1d2330;--sub:#5d6575;--line:#d9dde4;--blue:#2457c5;--green:#1f8a4c;--red:#c62f2f;--amber:#a86a12;--soft:#eef1f5}
   *{box-sizing:border-box}
@@ -101,6 +105,8 @@
   @media (max-width:640px){#cfgCard .grid{grid-template-columns:1fr}}
   .noScreen:not(.isMobile) .online,.noScreen .onlyScreen,.noFolder .onlyFolder{display:none!important}
   .noScreen:not(.isMobile) .modes{grid-template-columns:1fr}
+  #updBar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:50;background:#1d2330;color:#fff;border-radius:10px;padding:10px 14px;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.3);display:flex;gap:10px;align-items:center}
+  #updBar button{background:#fff;color:#1d2330;padding:6px 12px;font-weight:bold}
   .ver{font-size:12px;font-weight:normal;color:var(--sub);background:var(--soft);border-radius:999px;padding:2px 8px;vertical-align:middle}
   .mbOnly{display:none} .isMobile .mbOnly{display:inline} .isMobile .pcOnly{display:none}
   .hitem{border-top:1px solid var(--line);padding:10px 0}
@@ -128,7 +134,7 @@
 <body>
 <main>
   <header>
-    <h1>会議録音・議事録作成ツール <span class="ver" id="appVer">ver.21</span></h1>
+    <h1>会議録音・議事録作成ツール <span class="ver" id="appVer">ver.23</span></h1>
     <div class="tabs">
       <button class="tab on" data-tab="rec">録音する</button>
       <button class="tab" data-tab="smv">SMILE V 議事録</button>
@@ -289,10 +295,17 @@
 </main>
 
 <script>
+// 本体のプログラムが動かない端末（古いブラウザ・アプリ内ブラウザ）で、真っ白のままにしないための案内
+setTimeout(function(){ if(window.__recOk) return; var d=document.createElement('div');
+  d.style.cssText='margin:16px;padding:14px;border:2px solid #c62f2f;background:#fdecec;border-radius:10px;font-size:15px;line-height:1.7';
+  d.innerHTML='このブラウザではツールが動いていません。<br>・Chrome アプリで開き直してください（QRコードの読み取りアプリの中では動かないことがあります）<br>・Chrome を最新版に更新してください<br><a href="check.html">動作チェックを開く</a>';
+  document.body.insertBefore(d,document.body.firstChild); },6000);
+</script>
+<script>
 "use strict";
 const $ = id => document.getElementById(id);
 const AUDIO_BPS = 48000, VIDEO_BPS = 1500000, SLICE_MS = 5000, CONV_BPS = 32000;
-/*@@CFG*/const BUILTIN_CFG={"url":"https://script.google.com/macros/s/AKfycbzD-9bNYwKKvRBMagT2qbhy81kS-WMaeYHWmor0R1Q3JAofojScqwaTqfZr8aumCBa4GQ/exec","cid":"821499108634-4vhrpo1fjp2tcc858qq5ggkbsouls9e7.apps.googleusercontent.com"};/*CFG@@*/
+/*@@CFG*/const BUILTIN_CFG={"url":"","key":""};/*CFG@@*/
 const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
                 set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
 const pad = n => String(n).padStart(2,'0');
@@ -306,6 +319,21 @@ function show(id,msg){ const e=$(id); e.textContent=msg||''; e.classList.toggle(
 function pickMime(c){ return c.find(m=>window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || ''; }
 
 /* ---------- タブ ---------- */
+// 2回目以降をすぐ開けるように画面を端末に保存（新しい版が届いたら知らせる）
+if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+  // 新しい版が公開されていたら知らせる（表示は端末に保存した版、確認は裏で行う）
+  setTimeout(async()=>{
+    try{
+      const t=await (await fetch(location.pathname,{cache:'no-store'})).text();
+      const m=t.match(/const APP_VER='([^']+)'/);
+      if(!m||m[1]===APP_VER||$('updBar')) return;
+      const d=document.createElement('div'); d.id='updBar'; d.innerHTML=`新しい版（${m[1]}）があります <button>更新する</button>`;
+      d.querySelector('button').onclick=()=>{ if(S||UPLOADING||CONVERTING){ alert('録音・送信中は更新できません。終わってから押してください。'); return; } location.reload(); };
+      document.body.appendChild(d);
+    }catch(e){}
+  },2500);
+}
 let SMV_LOADING=false;
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
   if(S||CONVERTING) return;
@@ -420,7 +448,7 @@ $('btnNext').onclick=()=>{
   window.scrollTo({top:0,behavior:'smooth'});
 };
 /* ---------- 音声のダウンロード（録音直後は端末内のデータ、以前の分はGoogleドライブ） ---------- */
-const APP_VER='ver.21';
+const APP_VER='ver.23';
 const driveDl=id=>'https://drive.google.com/uc?export=download&id='+encodeURIComponent(id);
 let LAST=null;
 function dlBtn(){ $('btnDl').classList.toggle('hide',!(LAST&&(LAST.blob||LAST.id))); }
@@ -1028,6 +1056,7 @@ async function mp4ToOpus(file,prog){
     await dec.flush(); await drain(); dec.close(); if(decErr) throw decErr;
   });
 }
+window.__recOk=true;
 </script>
 </body>
 </html>
