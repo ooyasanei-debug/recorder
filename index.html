@@ -105,8 +105,6 @@
   @media (max-width:640px){#cfgCard .grid{grid-template-columns:1fr}}
   .noScreen:not(.isMobile) .online,.noScreen .onlyScreen,.noFolder .onlyFolder{display:none!important}
   .noScreen:not(.isMobile) .modes{grid-template-columns:1fr}
-  #updBar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:50;background:#1d2330;color:#fff;border-radius:10px;padding:10px 14px;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.3);display:flex;gap:10px;align-items:center}
-  #updBar button{background:#fff;color:#1d2330;padding:6px 12px;font-weight:bold}
   .ver{font-size:12px;font-weight:normal;color:var(--sub);background:var(--soft);border-radius:999px;padding:2px 8px;vertical-align:middle}
   .mbOnly{display:none} .isMobile .mbOnly{display:inline} .isMobile .pcOnly{display:none}
   .hitem{border-top:1px solid var(--line);padding:10px 0}
@@ -134,7 +132,7 @@
 <body>
 <main>
   <header>
-    <h1>会議録音・議事録作成ツール <span class="ver" id="appVer">ver.23</span></h1>
+    <h1>会議録音・議事録作成ツール <span class="ver" id="appVer">ver.25</span></h1>
     <div class="tabs">
       <button class="tab on" data-tab="rec">録音する</button>
       <button class="tab" data-tab="smv">SMILE V 議事録</button>
@@ -305,7 +303,7 @@ setTimeout(function(){ if(window.__recOk) return; var d=document.createElement('
 "use strict";
 const $ = id => document.getElementById(id);
 const AUDIO_BPS = 48000, VIDEO_BPS = 1500000, SLICE_MS = 5000, CONV_BPS = 32000;
-/*@@CFG*/const BUILTIN_CFG={"url":"https://script.google.com/macros/s/AKfycbzD-9bNYwKKvRBMagT2qbhy81kS-WMaeYHWmor0R1Q3JAofojScqwaTqfZr8aumCBa4GQ/exec","cid":"821499108634-4vhrpo1fjp2tcc858qq5ggkbsouls9e7.apps.googleusercontent.com"};/*CFG@@*/
+/*@@CFG*/const BUILTIN_CFG={"url":"","key":""};/*CFG@@*/
 const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
                 set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
 const pad = n => String(n).padStart(2,'0');
@@ -319,20 +317,9 @@ function show(id,msg){ const e=$(id); e.textContent=msg||''; e.classList.toggle(
 function pickMime(c){ return c.find(m=>window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || ''; }
 
 /* ---------- タブ ---------- */
-// 2回目以降をすぐ開けるように画面を端末に保存（新しい版が届いたら知らせる）
+// 通信が遅い・つながらないときでも開けるように、画面を端末に控えておく（普段は毎回最新版を表示）
 if('serviceWorker' in navigator && (location.protocol==='https:'||location.hostname==='localhost')){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
-  // 新しい版が公開されていたら知らせる（表示は端末に保存した版、確認は裏で行う）
-  setTimeout(async()=>{
-    try{
-      const t=await (await fetch(location.pathname,{cache:'no-store'})).text();
-      const m=t.match(/const APP_VER='([^']+)'/);
-      if(!m||m[1]===APP_VER||$('updBar')) return;
-      const d=document.createElement('div'); d.id='updBar'; d.innerHTML=`新しい版（${m[1]}）があります <button>更新する</button>`;
-      d.querySelector('button').onclick=()=>{ if(S||UPLOADING||CONVERTING){ alert('録音・送信中は更新できません。終わってから押してください。'); return; } location.reload(); };
-      document.body.appendChild(d);
-    }catch(e){}
-  },2500);
 }
 let SMV_LOADING=false;
 document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
@@ -448,7 +435,7 @@ $('btnNext').onclick=()=>{
   window.scrollTo({top:0,behavior:'smooth'});
 };
 /* ---------- 音声のダウンロード（録音直後は端末内のデータ、以前の分はGoogleドライブ） ---------- */
-const APP_VER='ver.23';
+const APP_VER='ver.25';
 const driveDl=id=>'https://drive.google.com/uc?export=download&id='+encodeURIComponent(id);
 let LAST=null;
 function dlBtn(){ $('btnDl').classList.toggle('hide',!(LAST&&(LAST.blob||LAST.id))); }
@@ -546,17 +533,22 @@ function refreshCfgUI(){
 let GIS_LOADING=null;
 function loadGis(){
   if(window.google&&google.accounts&&google.accounts.id) return Promise.resolve();
-  return GIS_LOADING||(GIS_LOADING=new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://accounts.google.com/gsi/client'; s.async=true; s.onload=res; s.onerror=()=>{GIS_LOADING=null; rej(new Error('Googleのログイン画面を読み込めません（ネットワークを確認してください）'));}; document.head.appendChild(s); }));
+  return GIS_LOADING||(GIS_LOADING=new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://accounts.google.com/gsi/client'; s.async=true;
+    const ng=m=>{ GIS_LOADING=null; rej(new Error(m)); };
+    const tm=setTimeout(()=>ng('Googleのログイン画面に接続できません（15秒たっても応答なし）。\nWi-Fiとモバイルデータを切り替えて試してください。会社の端末では通信制限で accounts.google.com が止められている可能性があります。'),15000);
+    s.onload=()=>{ clearTimeout(tm); res(); }; s.onerror=()=>{ clearTimeout(tm); ng('Googleのログイン画面を読み込めません。\nWi-Fiとモバイルデータを切り替えて試してください。会社の端末では通信制限で accounts.google.com が止められている可能性があります。'); };
+    document.head.appendChild(s); }));
 }
 async function showLogin(msg){
   if(!sheetReady()) return;
-  $('nameCard').classList.remove('hide'); $('nameMsg').textContent=msg||'';
+  $('nameCard').classList.remove('hide'); $('nameMsg').textContent=msg||'Googleのログイン画面を準備中…';
   const cid=cfg().cid;
   if(!cid){ $('nameMsg').textContent='ログインの設定がまだです。管理者に連絡してください（管理者用：ログイン用クライアントID が未設定）。'; return; }
   try{
     await loadGis();
     google.accounts.id.initialize({client_id:cid, callback:onGoogleLogin, auto_select:false, cancel_on_tap_outside:true});
     $('gBtn').innerHTML=''; google.accounts.id.renderButton($('gBtn'),{theme:'filled_blue',size:'large',text:'signin_with',locale:'ja'});
+    if($('nameMsg').textContent==='Googleのログイン画面を準備中…') $('nameMsg').textContent=msg||'';
   }catch(e){ $('nameMsg').textContent=e.message; }
 }
 async function onGoogleLogin(r){
@@ -600,7 +592,7 @@ $('cfgBake').onclick=async()=>{
     $('cfgMsg').textContent='index.html を作りました。GitHub の index.html に上書きアップロードしてください。';
   }catch(e){ $('cfgMsg').textContent='作れませんでした：'+e.message+'（GitHubで公開中のページから操作してください）'; }
 };
-window.SMV={ url:'http://smile-server/vwebapp/001/WFL/OSK.X1.WFL.X10010/90/' };   // SMILE V 打合議事録
+window.SMV={ url:'http://smile-server-n/vwebapp/001/WFL/OSK.X1.WFL.X10010/90/' };   // SMILE V2 打合議事録（2026/11 SMILE V2 へ移行）
 window.SHEET={ ready:()=>sheetReady()&&loggedIn(), user:()=>cfg().user, cfg:()=>({url:cfg().url}), gas:o=>gas(o) };
 async function gas(o,cc,ses){
   const c=cc||cfg(); let last; const session=ses||(AUTH()||{}).session||'';
