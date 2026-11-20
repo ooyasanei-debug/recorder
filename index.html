@@ -122,7 +122,8 @@
   a.sub{display:inline-block;text-decoration:none;border-radius:8px;font-size:15px}
   .mobileNote{display:none;margin-top:10px;font-size:12px;color:var(--sub)}
   .isMobile .mobileNote{display:block}
-  .isMobile .tab[data-tab=smv]{display:none}
+  .isMobile .tab[data-tab=smv],.isMobile #btnInstall{display:none}
+  #btnInstall{background:#e6f5ec;color:var(--green);border:1px solid var(--green)}
   .smvMode main{max-width:none;margin:8px 0 0;padding:0 10px 0}
   .smvMode main>*:not(header):not(#tab-smv){display:none!important}
   .smvMode header{margin-bottom:6px}
@@ -132,10 +133,11 @@
 <body>
 <main>
   <header>
-    <h1>会議録音・議事録作成ツール <span class="ver" id="appVer">ver.25</span></h1>
+    <h1>会議録音・議事録作成ツール <span class="ver" id="appVer">ver.26</span></h1>
     <div class="tabs">
       <button class="tab on" data-tab="rec">録音する</button>
       <button class="tab" data-tab="smv">SMILE V 議事録</button>
+      <button class="tab hide" id="btnInstall" title="このツールをパソコンのアプリとして追加します（デスクトップやスタートメニューから開けるようになります）">アプリとして追加</button>
       <button class="tab" id="btnCfg" title="設定">⚙ <span id="cfgChip" class="chip">スプシ未設定</span></button>
     </div>
   </header>
@@ -303,7 +305,7 @@ setTimeout(function(){ if(window.__recOk) return; var d=document.createElement('
 "use strict";
 const $ = id => document.getElementById(id);
 const AUDIO_BPS = 48000, VIDEO_BPS = 1500000, SLICE_MS = 5000, CONV_BPS = 32000;
-/*@@CFG*/const BUILTIN_CFG={"url":"https://script.google.com/macros/s/AKfycbzD-9bNYwKKvRBMagT2qbhy81kS-WMaeYHWmor0R1Q3JAofojScqwaTqfZr8aumCBa4GQ/exec","cid":"821499108634-4vhrpo1fjp2tcc858qq5ggkbsouls9e7.apps.googleusercontent.com"};/*CFG@@*/
+/*@@CFG*/const BUILTIN_CFG={"url":"","key":""};/*CFG@@*/
 const store = { get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v);}catch(e){return d;} },
                 set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} } };
 const pad = n => String(n).padStart(2,'0');
@@ -435,7 +437,7 @@ $('btnNext').onclick=()=>{
   window.scrollTo({top:0,behavior:'smooth'});
 };
 /* ---------- 音声のダウンロード（録音直後は端末内のデータ、以前の分はGoogleドライブ） ---------- */
-const APP_VER='ver.25';
+const APP_VER='ver.26';
 const driveDl=id=>'https://drive.google.com/uc?export=download&id='+encodeURIComponent(id);
 let LAST=null;
 function dlBtn(){ $('btnDl').classList.toggle('hide',!(LAST&&(LAST.blob||LAST.id))); }
@@ -567,6 +569,15 @@ function logout(msg){
   refreshCfgUI(); showLogin(msg);
 }
 setTimeout(()=>{ refreshCfgUI(); if(sheetReady()&&!loggedIn()) showLogin(); },0);
+/* ---------- アプリとして追加（Chrome / Edge のインストール） ---------- */
+// アドレスバー右側のインストールボタンと同じ操作を、画面のボタンからも行えるようにする
+let INSTALL=null;
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); INSTALL=e; $('btnInstall').classList.remove('hide'); });
+window.addEventListener('appinstalled',()=>{ INSTALL=null; $('btnInstall').classList.add('hide'); });
+$('btnInstall').onclick=async()=>{
+  if(!INSTALL){ alert('Chrome または Edge のアドレスバー右側にある「インストール」のアイコンから追加してください。'); return; }
+  INSTALL.prompt(); try{ await INSTALL.userChoice; }catch(e){} INSTALL=null; $('btnInstall').classList.add('hide');
+};
 $('btnCfg').onclick=()=>{ $('cfgUrl').value=cfg().url; $('cfgCid').value=cfg().cid;
   $('cfgCard').classList.toggle('hide'); $('cfgMsg').textContent=''; refreshCfgUI(); };
 $('cfgClose').onclick=()=>$('cfgCard').classList.add('hide');
